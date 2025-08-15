@@ -49,6 +49,8 @@ To provide an accessible, user-friendly tool for women to:
 - PDF export and email report (via mailto)
 - Data persistence with Vercel KV storage
 - API endpoints for saving responses and emails
+- **Real-time store search** for finding local stores and online options
+- **Location-based recommendations** with Google Places API integration
 - Auvra branding and clear medical disclaimer
 
 ---
@@ -80,6 +82,10 @@ To provide an accessible, user-friendly tool for women to:
 ## 🚀 Deployment
 
 For production deployment with data storage, see [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions on deploying to Vercel with Upstash Redis database.
+
+## 🏪 Store Search Setup
+
+For real-time store search functionality, see [STORE_SEARCH_SETUP.md](./STORE_SEARCH_SETUP.md) for detailed instructions on configuring Google Places API and enabling location-based store recommendations.
 
 <!-- Updated deployment info -->
 

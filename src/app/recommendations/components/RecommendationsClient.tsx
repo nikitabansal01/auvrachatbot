@@ -20,12 +20,13 @@ interface RecommendationsClientProps {
 const RecommendationsClient: React.FC<RecommendationsClientProps> = ({ initialData, initialRecommendations, chatbotState, chatbotDispatch }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { updateRecommendations } = useCurrentRecommendations();
+  const { updateRecommendations, shouldRefresh, currentRecommendations } = useCurrentRecommendations();
   const [surveyData] = useState<SurveyResponses | null>(initialData.surveyData);
   const [results] = useState<ResultsSummary | null>(initialData.results);
   const [loading, setLoading] = useState(!initialRecommendations);
   const [activeTab, setActiveTab] = useState<'food' | 'movement' | 'mindfulness'>('food');
   const [recommendations, setRecommendations] = useState<RecommendationResult | null>(initialRecommendations || null);
+  const [showUpdateNotification, setShowUpdateNotification] = useState(false);
   const chatbotStateData = chatbotState || { recommendationChanges: { shouldRefresh: false, refreshReason: '', alternativePreferences: [] } };
 
   useEffect(() => {
@@ -52,6 +53,82 @@ const RecommendationsClient: React.FC<RecommendationsClientProps> = ({ initialDa
       }, 1000);
     }
   }, [chatbotStateData.recommendationChanges.shouldRefresh]);
+
+  // Watch for context refresh signal (from personalization updates)
+  useEffect(() => {
+    if (shouldRefresh) {
+      console.log('🔄 Context refresh signal received - updating recommendations display');
+      
+      // Get the updated recommendations from the context
+      // const { currentRecommendations } = useCurrentRecommendations(); // This line is removed
+      console.log('📋 Updated recommendations from context:', currentRecommendations);
+      
+      // Convert context recommendations to the format expected by the component
+      if (currentRecommendations && currentRecommendations.length > 0) {
+        const updatedRecResult: RecommendationResult = {
+          food: [],
+          movement: [],
+          mindfulness: [],
+          userProfile: recommendations?.userProfile || {
+            hormoneScores: { androgens: 0, progesterone: 0, estrogen: 0, thyroid: 0, cortisol: 0, insulin: 0 },
+            primaryImbalance: '',
+            secondaryImbalances: [],
+            conditions: [],
+            symptoms: [],
+            cyclePhase: 'unknown',
+            birthControlStatus: 'No',
+            age: undefined,
+            ethnicity: undefined,
+            cravings: [],
+            confidence: 'low'
+          },
+          generatedAt: new Date().toISOString()
+        };
+        
+        // Categorize the updated recommendations
+        currentRecommendations.forEach(rec => {
+          const mappedRec: import('../../types/ResearchData').Recommendation = {
+            id: `personalized-${Date.now()}-${Math.random()}`,
+            category: (rec.category as 'food' | 'movement' | 'mindfulness') || 'food',
+            title: rec.title || 'Personalized Recommendation',
+            specificAction: rec.specificAction || 'Follow personalized guidance',
+            researchBacking: {
+              studies: [],
+              summary: rec.researchBacking?.summary || 'Personalized recommendation based on your preferences'
+            },
+            expectedTimeline: rec.expectedTimeline || '2-4 weeks',
+            contraindications: (rec.contraindications as string[]) || [],
+            frequency: rec.frequency || 'Daily',
+            isPersonalized: rec.isPersonalized || true,
+            personalizationDate: rec.personalizationDate || new Date().toISOString(),
+            originalTitle: rec.originalTitle || rec.title || 'Personalized Recommendation',
+            originalAction: rec.originalAction || rec.specificAction || 'Follow personalized guidance',
+            intensity: 'moderate',
+            priority: (rec.priority as 'high' | 'medium' | 'low') || 'medium',
+            relevanceScore: 85 // High relevance for personalized recommendations
+          };
+          
+          if (mappedRec.category === 'food' || !mappedRec.category) {
+            updatedRecResult.food.push(mappedRec);
+          } else if (mappedRec.category === 'movement') {
+            updatedRecResult.movement.push(mappedRec);
+          } else if (mappedRec.category === 'mindfulness') {
+            updatedRecResult.mindfulness.push(mappedRec);
+          }
+        });
+        
+        console.log('🔄 Updated recommendations result:', updatedRecResult);
+        setRecommendations(updatedRecResult);
+        
+        // Show update notification
+        setShowUpdateNotification(true);
+        setTimeout(() => setShowUpdateNotification(false), 5000);
+      }
+      
+      // Show a brief notification that recommendations have been updated
+      console.log('✅ Recommendations display updated from context');
+    }
+  }, [shouldRefresh, currentRecommendations]); // Added currentRecommendations to dependency array
 
   const generateLLMRecommendationsFromSurvey = async () => {
     try {
@@ -208,6 +285,16 @@ const RecommendationsClient: React.FC<RecommendationsClientProps> = ({ initialDa
             🔄 Recommendations refreshed based on your feedback: "{chatbotStateData.recommendationChanges.refreshReason}"
           </div>
         )}
+        {shouldRefresh && (
+          <div className={styles.personalizationNotice}>
+            🎯 **Recommendations Updated!** Your personalized changes have been applied to the main page.
+          </div>
+        )}
+        {showUpdateNotification && (
+          <div className={styles.updateNotification}>
+            🎯 **Personalized Recommendations Applied!** Your selected recommendations from the chatbot have been transferred to this page.
+          </div>
+        )}
       </div>
 
 
@@ -243,6 +330,16 @@ const RecommendationsClient: React.FC<RecommendationsClientProps> = ({ initialDa
           </div>
         </div>
       )}
+      {/* Context Update Notice */}
+      {shouldRefresh && (
+        <div className={styles.personalizationNotice}>
+          <div className={styles.personalizationIcon}>✅</div>
+          <div className={styles.personalizationText}>
+            <strong>Recommendations Updated!</strong>
+            <p>Your personalized changes have been applied. The recommendations below now reflect your preferences.</p>
+          </div>
+        </div>
+      )}
         
       <div className={styles.content}>
         <div className={styles.recommendationsList}>
@@ -254,6 +351,11 @@ const RecommendationsClient: React.FC<RecommendationsClientProps> = ({ initialDa
                     {getCategoryIcon(recommendation.category)}
                   </span>
                   <h3>{recommendation.title}</h3>
+                  {recommendation.isPersonalized && (
+                    <span className={styles.personalizationBadge} title={`Personalized on ${new Date(recommendation.personalizationDate || '').toLocaleDateString()}`}>
+                      🎯 Personalized
+                    </span>
+                  )}
                 </div>
                 <div className={styles.priorityBadge}>
                   <span 

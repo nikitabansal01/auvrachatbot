@@ -8,12 +8,15 @@ export type ChatbotFlow =
   | 'feedback-reason'
   | 'select-food-item'
   | 'personalization-options'
+  | 'personalized-recommendations'
+  | 'recommendations-accepted'
   | 'select-restriction-food-item'
   | 'restriction-personalization-options'
   | 'select-taste-food-item'
   | 'taste-personalization-options'
   | 'select-too-hard-item'
   | 'too-hard-personalization-options'
+  | 'location-store-finder'
   | null;
 
 export type ChatbotState = {
@@ -85,6 +88,13 @@ export type ChatbotState = {
     dailyActions: string;
     easiestToStart: 'food' | 'move' | 'emotions' | null;
   };
+  // New state for store finder functionality
+  storeFinder: {
+    selectedFoodItem: string | null;
+    location: string;
+    searchResults: any[];
+    isSearching: boolean;
+  };
 };
 
 export type ChatbotAction = 
@@ -112,10 +122,13 @@ export type ChatbotAction =
   | { type: 'SET_TIME_PER_DAY'; time: string }
   | { type: 'SET_DAILY_ACTIONS'; actions: string }
   | { type: 'SET_EASIEST_TO_START'; category: 'food' | 'move' | 'emotions' }
-  | { type: 'RESET_DAILY' }
   | { type: 'TRIGGER_RECOMMENDATION_REFRESH'; reason: string; preferences: string[] }
   | { type: 'RESET_RECOMMENDATION_REFRESH' }
-  | { type: 'RESET_CHATBOT_STATE' };
+  | { type: 'RESET_DAILY' }
+  | { type: 'RESET_CHATBOT_STATE' }
+  | { type: 'TRIGGER_STORE_FINDER'; foodItem: string }
+  | { type: 'SET_STORE_FINDER_LOCATION'; location: string }
+  | { type: 'SET_STORE_FINDER_RESULTS'; results: any[] };
 
 // Initial state
 const initialState: ChatbotState = {
@@ -192,6 +205,12 @@ const initialState: ChatbotState = {
     timePerDay: '',
     dailyActions: '',
     easiestToStart: null
+  },
+  storeFinder: {
+    selectedFoodItem: null,
+    location: '',
+    searchResults: [],
+    isSearching: false
   }
 };
 
@@ -464,6 +483,34 @@ function chatbotReducer(state: ChatbotState, action: ChatbotAction): ChatbotStat
       return {
         ...initialState,
         userProfile: state.userProfile // Keep user profile
+      };
+
+    case 'TRIGGER_STORE_FINDER':
+      return {
+        ...state,
+        storeFinder: {
+          ...state.storeFinder,
+          selectedFoodItem: action.foodItem
+        }
+      };
+
+    case 'SET_STORE_FINDER_LOCATION':
+      return {
+        ...state,
+        storeFinder: {
+          ...state.storeFinder,
+          location: action.location
+        }
+      };
+
+    case 'SET_STORE_FINDER_RESULTS':
+      return {
+        ...state,
+        storeFinder: {
+          ...state.storeFinder,
+          searchResults: action.results,
+          isSearching: false
+        }
       };
     
     default:

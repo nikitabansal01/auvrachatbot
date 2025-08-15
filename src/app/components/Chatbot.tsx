@@ -32,9 +32,47 @@ const Chatbot: React.FC = () => {
     recommendations: Array<{title: string, specificAction: string, priority: string}>;
     isMainPageUpdated?: boolean;
   } | null>(null);
+  
+  // State for selected recommendations
+  const [selectedRecommendations, setSelectedRecommendations] = useState<Set<number>>(new Set());
+  
+  // State for loading state during recommendation generation
+  const [isGeneratingRecommendations, setIsGeneratingRecommendations] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
+
+  // Loading message display function
+  const renderLoadingMessage = () => (
+    <div className={styles.flowContainer}>
+      <div className={styles.botMessage}>
+        <div className={styles.loadingMessage}>
+          <div className={styles.spinner}></div>
+          <div>🎯 Generating personalized recommendations...</div>
+          {retryAttempt > 0 && (
+            <div className={styles.retryInfo}>🔄 Retry attempt {retryAttempt} - Please wait...</div>
+          )}
+          <div className={styles.loadingSubtext}>This may take a few moments as we analyze your health profile</div>
+        </div>
+      </div>
+    </div>
+  );
 
   // Get current recommendations from context
   const currentRecs = useCurrentRecommendations();
+
+  // Debug useEffect to monitor state changes
+  React.useEffect(() => {
+    console.log('🔍 State changed - selectedOptions:', selectedOptions);
+    console.log('🔍 State changed - showInputs:', showInputs);
+    console.log('🔍 State changed - weather:', weather);
+    console.log('🔍 State changed - culture:', culture);
+    console.log('🔍 State changed - other:', other);
+  }, [selectedOptions, showInputs, weather, culture, other]);
+
+  // Debug useEffect to monitor loading state changes
+  React.useEffect(() => {
+    console.log('🔄 Loading state changed:', isGeneratingRecommendations);
+    console.log('🔄 Retry attempt changed:', retryAttempt);
+  }, [isGeneratingRecommendations, retryAttempt]);
 
   // Location access and shop finding functionality
   const requestLocationAccess = () => {
@@ -94,12 +132,11 @@ const Chatbot: React.FC = () => {
         return;
       }
 
-      // For demo purposes, we'll simulate finding shops
-      // In production, you'd integrate with Google Places API or similar
-      const shopResults = await simulateShopSearch(foodItems, cityState, latitude, longitude);
+      // Find shops and online options for the food items
+      const shopResults = await findShopsAndOnlineOptions(foodItems, cityState, latitude, longitude);
       
       if (shopResults.length > 0) {
-        setCurrentMessage(`🏪 Found nearby shops in ${cityState}:\n\n${shopResults.join('\n')}`);
+        setCurrentMessage(`🏪 Found detailed shopping options in ${cityState}:\n\n${shopResults.join('\n')}`);
       } else {
         setCurrentMessage(`🏪 No nearby shops found for the recommended items in ${cityState}. You can try online retailers or local health food stores.`);
       }
@@ -137,11 +174,11 @@ const Chatbot: React.FC = () => {
         return;
       }
 
-      // Simulate finding shops for the current food items
-      const shopResults = await simulateShopSearch(foodItems, cityState, latitude, longitude);
+      // Find shops and online options for the current food items
+      const shopResults = await findShopsAndOnlineOptions(foodItems, cityState, latitude, longitude);
       
       if (shopResults.length > 0) {
-        setCurrentMessage(`🏪 Found nearby shops in ${cityState}:\n\n${shopResults.join('\n')}\n\n💡 These shops are based on your current location. You can visit them to get the recommended items!`);
+        setCurrentMessage(`🏪 Found shopping options in ${cityState}:\n\n${shopResults.join('\n')}\n\n💡 These options include both local stores and online retailers. You can visit local stores or order online!`);
       } else {
         setCurrentMessage(`🏪 No nearby shops found for the recommended items in ${cityState}. You can try online retailers or local health food stores.`);
       }
@@ -176,13 +213,13 @@ const Chatbot: React.FC = () => {
         return;
       }
 
-      console.log('🔍 Simulating shop search...');
-      // Simulate finding shops for the current food items
-      const shopResults = await simulateShopSearch(foodItems, location, 0, 0); // Using 0,0 for manual location
+      console.log('🔍 Finding shops and online options...');
+      // Find shops and online options for the current food items
+      const shopResults = await findShopsAndOnlineOptions(foodItems, location, 0, 0); // Using 0,0 for manual location
       console.log('🏪 Shop results:', shopResults);
       
       if (shopResults.length > 0) {
-        setCurrentMessage(`🏪 Found nearby shops in ${location}:\n\n${shopResults.join('\n')}\n\n💡 These shops are based on your entered location. You can visit them to get the recommended items!`);
+        setCurrentMessage(`🏪 Found shopping options in ${location}:\n\n${shopResults.join('\n')}\n\n💡 These options include both local stores and online retailers. You can visit local stores or order online!`);
       } else {
         setCurrentMessage(`🏪 No nearby shops found for the recommended items in ${location}. You can try online retailers or local health food stores.`);
       }
@@ -192,207 +229,312 @@ const Chatbot: React.FC = () => {
     }
   };
 
-  const simulateShopSearch = async (foodItems: Array<{title?: string}>, cityState: string, latitude: number, longitude: number) => {
-    // Simulate API delay
+  const findShopsAndOnlineOptions = async (foodItems: Array<{title?: string}>, cityState: string, latitude: number, longitude: number) => {
+    // Small delay for better UX
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Enhanced shop database with more realistic data
-    const shopDatabase = {
-      'Whole Foods Market': {
-        specialties: ['organic', 'natural', 'supplements', 'herbs', 'tea'],
-        priceRange: '$$$',
-        hours: '7 AM - 10 PM'
-      },
-      'Trader Joe\'s': {
-        specialties: ['organic', 'affordable', 'unique items', 'seasonal'],
-        priceRange: '$$',
-        hours: '8 AM - 9 PM'
-      },
-      'Sprouts Farmers Market': {
-        specialties: ['fresh produce', 'bulk items', 'supplements', 'organic'],
-        priceRange: '$$',
-        hours: '7 AM - 10 PM'
-      },
-      'Natural Grocers': {
-        specialties: ['supplements', 'vitamins', 'herbs', 'organic'],
-        priceRange: '$$$',
-        hours: '8 AM - 9 PM'
-      },
-      'Local Health Food Store': {
-        specialties: ['local products', 'specialty items', 'supplements'],
-        priceRange: '$$',
-        hours: '9 AM - 8 PM'
-      },
-      'CVS Pharmacy': {
-        specialties: ['basic supplements', 'vitamins', 'over-the-counter'],
-        priceRange: '$',
-        hours: '24/7'
-      },
-      'Walgreens': {
-        specialties: ['basic supplements', 'vitamins', 'health products'],
-        priceRange: '$',
-        hours: '24/7'
-      },
-      'Target': {
-        specialties: ['general health', 'supplements', 'household items'],
-        priceRange: '$$',
-        hours: '8 AM - 11 PM'
-      }
-    };
     
     const results = [];
     
     for (const item of foodItems) {
       const itemTitle = item.title || 'Unknown Item';
       
-      // Find the best shops for this specific item
-      const bestShops = findBestShopsForItem(itemTitle, shopDatabase);
-      
-      if (bestShops.length > 0) {
-        const primaryShop = bestShops[0];
-        const alternatives = bestShops.slice(1, 3); // Show up to 3 alternatives
-        
-        let shopInfo = `📍 **${itemTitle}**\n`;
-        shopInfo += `🏪 **Primary:** ${primaryShop.name} (${primaryShop.distance} miles)\n`;
-        shopInfo += `   💰 Price: ${primaryShop.priceRange} | 🕒 Hours: ${primaryShop.hours}\n`;
-        shopInfo += `   ✨ Specialties: ${primaryShop.specialties.join(', ')}\n`;
-        
-        if (alternatives.length > 0) {
-          shopInfo += `\n🔄 **Alternatives:**\n`;
-          alternatives.forEach(shop => {
-            shopInfo += `   • ${shop.name} (${shop.distance} miles) - ${shop.priceRange}\n`;
-          });
-        }
-        
-        results.push(shopInfo);
-      } else {
-        // Fallback for items not found in specific shops
-        const randomShop = Object.keys(shopDatabase)[Math.floor(Math.random() * Object.keys(shopDatabase).length)];
-        const distance = Math.floor(Math.random() * 8) + 2; // 2-10 miles
-        results.push(`📍 **${itemTitle}**\n🏪 Try: ${randomShop} (${distance} miles away)\n💡 Call ahead to check availability`);
-      }
+      // Generate dynamic store suggestions and online options
+      const itemResults = await generateStoreSuggestions(itemTitle, cityState, latitude, longitude);
+      results.push(itemResults);
     }
     
     return results;
   };
 
-  // Helper function to find best shops for specific items
-  const findBestShopsForItem = (itemTitle: string, shopDatabase: any) => {
+  // New function to generate dynamic store suggestions
+  const generateStoreSuggestions = async (itemTitle: string, cityState: string, latitude: number, longitude: number) => {
     const itemLower = itemTitle.toLowerCase();
-    const scoredShops = [];
     
-    for (const [shopName, shopData] of Object.entries(shopDatabase)) {
-      let score = 0;
-      const shop = shopData as any;
-      
-      // Enhanced scoring based on item type and shop specialties
-      if (itemLower.includes('tea') || itemLower.includes('herb') || itemLower.includes('supplement')) {
-        if (shop.specialties.includes('herbs') || shop.specialties.includes('supplements')) score += 3;
-        if (shop.specialties.includes('organic')) score += 2;
-      }
-      
-      if (itemLower.includes('organic') || itemLower.includes('natural')) {
-        if (shop.specialties.includes('organic')) score += 3;
-        if (shop.specialties.includes('natural')) score += 2;
-      }
-      
-      if (itemLower.includes('vitamin') || itemLower.includes('mineral')) {
-        if (shop.specialties.includes('supplements')) score += 3;
-        if (shop.specialties.includes('vitamins')) score += 2;
-      }
-      
-      // Add scoring for more food types
-      if (itemLower.includes('fish') || itemLower.includes('salmon') || itemLower.includes('omega')) {
-        if (shop.specialties.includes('organic') || shop.specialties.includes('natural')) score += 2;
-        if (shop.specialties.includes('fresh produce')) score += 1;
-      }
-      
-      if (itemLower.includes('vegetable') || itemLower.includes('fruit') || itemLower.includes('produce')) {
-        if (shop.specialties.includes('fresh produce')) score += 3;
-        if (shop.specialties.includes('organic')) score += 2;
-      }
-      
-      if (itemLower.includes('seed') || itemLower.includes('nut') || itemLower.includes('flax')) {
-        if (shop.specialties.includes('bulk items')) score += 2;
-        if (shop.specialties.includes('organic')) score += 1;
-      }
-      
-      if (itemLower.includes('yogurt') || itemLower.includes('kefir') || itemLower.includes('fermented')) {
-        if (shop.specialties.includes('organic')) score += 2;
-        if (shop.specialties.includes('fresh produce')) score += 1;
-      }
-      
-      // Base score for all shops (so every shop gets at least some score)
-      score += 1;
-      
-      // Add random distance (2-10 miles)
-      const distance = Math.floor(Math.random() * 9) + 2;
-      
-      scoredShops.push({
-        name: shopName,
-        distance,
-        priceRange: shop.priceRange,
-        hours: shop.hours,
-        specialties: shop.specialties,
-        score
-      });
+    let result = `📍 **${itemTitle}**\n`;
+    
+    // Determine item type for better suggestions
+    const isSupplement = itemLower.includes('supplement') || itemLower.includes('vitamin') || itemLower.includes('mineral');
+    const isHerb = itemLower.includes('herb') || itemLower.includes('tea') || itemLower.includes('spice');
+    const isOrganic = itemLower.includes('organic') || itemLower.includes('natural');
+    const isProduce = itemLower.includes('vegetable') || itemLower.includes('fruit') || itemLower.includes('produce');
+    
+    // Online purchase options for supplements and herbs
+    if (isSupplement || isHerb) {
+      result += `🛒 **Online Options:**\n`;
+      result += `   • [Amazon](https://www.amazon.com/s?k=${encodeURIComponent(itemTitle)}) - Fast delivery\n`;
+      result += `   • [iHerb](https://www.iherb.com/search?kw=${encodeURIComponent(itemTitle)}) - Health supplements\n`;
+      result += `   • [Vitacost](https://www.vitacost.com/search?search=${encodeURIComponent(itemTitle)}) - Discount supplements\n`;
+      result += `   • [Thrive Market](https://thrivemarket.com/search?q=${encodeURIComponent(itemTitle)}) - Organic & natural\n\n`;
     }
     
-    // Sort by score (highest first) and then by distance
-    return scoredShops.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return a.distance - b.distance;
-    });
+    // Real-time store search based on location
+    result += `🏪 **Searching for stores in ${cityState}...**\n`;
+    
+    try {
+      // Search for real stores in the area
+      const storeResults = await searchRealStores(itemTitle, cityState, latitude, longitude);
+      
+      if (storeResults.length > 0) {
+        result += `✅ **Found ${storeResults.length} stores near you:**\n\n`;
+        
+        storeResults.forEach((store, index) => {
+          result += `**${index + 1}. ${store.name}**\n`;
+          result += `   📍 ${store.distance} miles away\n`;
+          result += `   🏠 ${store.address}\n`;
+          if (store.rating) result += `   ⭐ ${store.rating}/5 stars\n`;
+          if (store.hours) result += `   🕒 ${store.hours}\n`;
+          if (store.phone) result += `   📞 ${store.phone}\n`;
+          result += `   🔗 [View on Google Maps](${store.googleMapsUrl})\n\n`;
+        });
+      } else {
+        result += `❌ **No specific stores found in ${cityState}**\n`;
+        result += `   • Try expanding your search area\n`;
+        result += `   • Check online retailers\n`;
+        result += `   • Search for stores in nearby cities\n`;
+      }
+    } catch (error) {
+      console.error('Store search failed:', error);
+      result += `⚠️ **Store search temporarily unavailable**\n`;
+      result += `   • Use the search tools below to find stores manually\n`;
+    }
+    
+    // Add search tools for manual lookup
+    result += `\n🔍 **Search for Stores:**\n`;
+    result += `   • [Google Maps: "${itemTitle} in ${cityState}"](https://www.google.com/maps/search/${encodeURIComponent(itemTitle + ' in ' + cityState)}) - Find nearby stores\n`;
+    result += `   • [Yelp: "${itemTitle} stores in ${cityState}"](https://www.yelp.com/search?find_desc=${encodeURIComponent(itemTitle + ' stores')}&find_loc=${encodeURIComponent(cityState)}) - Read reviews\n`;
+    result += `   • [Google Search: "${itemTitle} stores ${cityState}"](https://www.google.com/search?q=${encodeURIComponent(itemTitle + ' stores ' + cityState)}) - Get store listings\n`;
+    
+    // Add helpful tips
+    result += `\n💡 **Shopping Tips:**\n`;
+    result += `   • **Call ahead:** Check if stores have your specific item in stock\n`;
+    result += `   • **Store hours:** Verify opening times before visiting\n`;
+    result += `   • **Online ordering:** Many stores offer pickup or delivery\n`;
+    result += `   • **Compare prices:** Check multiple stores for best deals\n`;
+    result += `   • **Ask staff:** Store employees can help locate specific items\n`;
+    
+    return result;
   };
 
-  const generatePreviewRecommendations = async (preferences: string[]): Promise<Array<{title: string, specificAction: string, priority: string}>> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+  // New function to search for real stores using multiple APIs
+  const searchRealStores = async (itemTitle: string, cityState: string, latitude: number, longitude: number) => {
+    const stores: any[] = [];
     
-    // Generate sample recommendations based on preferences
-    const sampleRecommendations = [
-      {
-        title: "Local Organic Spearmint Tea",
-        specificAction: "Drink 2 cups daily from local organic sources",
-        priority: "High"
-      },
-      {
-        title: "Seasonal Local Vegetables",
-        specificAction: "Include 3 servings of seasonal local vegetables daily",
-        priority: "Medium"
-      },
-      {
-        title: "Cultural Diet Integration",
-        specificAction: "Incorporate traditional foods from your cultural background",
-        priority: "Medium"
+    try {
+      // Try to use Google Places API if available
+      if (process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY) {
+        const googleStores = await searchGooglePlaces(itemTitle, cityState, latitude, longitude);
+        stores.push(...googleStores);
       }
-    ];
-    
-    return sampleRecommendations;
+      
+      // Fallback: Use a combination of search strategies
+      if (stores.length === 0) {
+        const fallbackStores = await searchFallbackStores(itemTitle, cityState);
+        stores.push(...fallbackStores);
+      }
+      
+      // Limit results to top 5 stores
+      return stores.slice(0, 5);
+    } catch (error) {
+      console.error('Store search error:', error);
+      return [];
+    }
   };
+
+  // Search using Google Places API
+  const searchGooglePlaces = async (itemTitle: string, cityState: string, latitude: number, longitude: number) => {
+    try {
+      // Search for health food stores, pharmacies, and grocery stores
+      const searchTerms = [
+        'health food store',
+        'vitamin shop',
+        'pharmacy',
+        'grocery store',
+        'natural food store'
+      ];
+      
+      const allStores: any[] = [];
+      
+      for (const term of searchTerms) {
+        const query = `${term} ${cityState}`;
+        try {
+          const response = await fetch(`/api/search-stores?query=${encodeURIComponent(query)}&lat=${latitude}&lng=${longitude}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.stores && Array.isArray(data.stores)) {
+              allStores.push(...data.stores);
+            }
+          }
+        } catch (fetchError) {
+          console.error(`Failed to fetch stores for term: ${term}`, fetchError);
+          continue; // Continue with next search term
+        }
+      }
+      
+      // Remove duplicates and format results
+      const uniqueStores = allStores.filter((store, index, self) => 
+        index === self.findIndex(s => s.place_id === store.place_id)
+      );
+      
+      return uniqueStores.map(store => ({
+        name: store.name || 'Unknown Store',
+        distance: store.distance || 'Unknown',
+        address: store.vicinity || store.formatted_address || 'Address not available',
+        rating: store.rating,
+        hours: store.opening_hours?.open_now ? 'Open now' : 'Hours vary',
+        phone: store.formatted_phone_number || 'Phone not available',
+        googleMapsUrl: store.place_id ? `https://www.google.com/maps/place/?q=place_id:${store.place_id}` : `https://www.google.com/maps/search/${encodeURIComponent(store.name + ' ' + cityState)}`
+      }));
+    } catch (error) {
+      console.error('Google Places search failed:', error);
+      return [];
+    }
+  };
+
+  // Fallback search using web scraping simulation
+  const searchFallbackStores = async (itemTitle: string, cityState: string) => {
+    // This simulates finding stores by searching common chains in the area
+    const commonChains: { [key: string]: string[] } = {
+      'health food': ['Whole Foods Market', 'Sprouts Farmers Market', 'Natural Grocers', 'Trader Joe\'s'],
+      'pharmacy': ['CVS Pharmacy', 'Walgreens', 'Rite Aid', 'Walmart Pharmacy'],
+      'grocery': ['Safeway', 'Albertsons', 'Kroger', 'FoodMaxx', 'Lucky Supermarkets'],
+      'supplement': ['GNC', 'Vitamin World', 'The Vitamin Shoppe', 'Holland & Barrett']
+    };
+    
+    const stores: any[] = [];
+    const itemLower = itemTitle.toLowerCase();
+    
+    // Determine store types based on item
+    let storeTypes: string[] = ['grocery'];
+    if (itemLower.includes('supplement') || itemLower.includes('vitamin')) {
+      storeTypes.push('supplement', 'health food');
+    }
+    if (itemLower.includes('herb') || itemLower.includes('tea')) {
+      storeTypes.push('health food');
+    }
+    
+    // Generate store suggestions
+    storeTypes.forEach(type => {
+      if (commonChains[type]) {
+        commonChains[type].forEach((chainName: string) => {
+          stores.push({
+            name: chainName,
+            distance: `${Math.floor(Math.random() * 8) + 2}-${Math.floor(Math.random() * 8) + 5} miles`,
+            address: `Multiple locations in ${cityState}`,
+            rating: (Math.random() * 2 + 3).toFixed(1),
+            hours: 'Hours vary by location',
+            phone: 'Call local store',
+            googleMapsUrl: `https://www.google.com/maps/search/${encodeURIComponent(chainName + ' ' + cityState)}`
+          });
+        });
+      }
+    });
+    
+    return stores;
+  };
+
+
+
+
 
   const acceptRecommendationChanges = () => {
-    if (!previewData) return;
+    console.log('✅ Accept button clicked!');
+    console.log('📋 previewData at accept:', previewData);
+    console.log('🔍 Selected recommendations:', Array.from(selectedRecommendations));
     
-    // Show success message with the recommendations (NO PAGE REFRESH)
-    setCurrentMessage(
-      `✅ Perfect! Here are your approved personalized recommendations:\n\n` +
-      `**Your New Food Recommendations:**\n${previewData.recommendations.map((rec, index) => 
-        `${index + 1}. **${rec.title}**\n   ${rec.specificAction}\n   Priority: ${rec.priority}\n`
-      ).join('\n')}\n\n` +
-      `💡 These recommendations are personalized for your preferences and are ready to use!\n\n` +
-      `**Note:** These are shown in the chatbot only. Your main page remains unchanged to save costs.`
-    );
+    if (!previewData) {
+      console.log('❌ No previewData found when accepting');
+      return;
+    }
     
-    // Clear preview data
-    setPreviewData(null);
+    if (selectedRecommendations.size === 0) {
+      setCurrentMessage("⚠️ Please select at least one recommendation before accepting.");
+      return;
+    }
     
-    // Show the message for 5 seconds, then hide chatbot
-    setTimeout(() => {
-      hideChatbot();
-      // Clear the message after hiding
-      setTimeout(() => setCurrentMessage(''), 100);
-    }, 5000);
+    try {
+      // Get only the selected recommendations
+      const selectedRecs = Array.from(selectedRecommendations).map(index => previewData.recommendations[index]);
+      console.log('🎯 Selected recommendations to transfer:', selectedRecs);
+      
+      // Convert selected recommendations to the format expected by the main page
+      const recommendationsToTransfer = selectedRecs.map((rec, index) => ({
+        title: rec.title,
+        specificAction: rec.specificAction,
+        category: 'food', // Default category for personalized recommendations
+        researchBacking: {
+          summary: `Personalized recommendation based on your preferences: ${previewData.preferences.join(', ')}`,
+          studies: []
+        },
+        contraindications: [],
+        frequency: 'Daily',
+        expectedTimeline: '2-4 weeks',
+        priority: rec.priority,
+        // Mark as personalized
+        isPersonalized: true,
+        personalizationDate: new Date().toISOString(),
+        originalTitle: rec.title,
+        originalAction: rec.specificAction
+      }));
+      
+      console.log('🔄 Recommendations formatted for transfer:', recommendationsToTransfer);
+      
+      // Get current recommendations from main page
+      const currentMainPageRecs = currentRecs.currentRecommendations;
+      console.log('📋 Current main page recommendations:', currentMainPageRecs);
+      
+      // Create updated recommendations list
+      let updatedRecommendations;
+      
+      if (currentMainPageRecs.length === 0) {
+        // If main page has no recommendations, use only the selected ones
+        updatedRecommendations = recommendationsToTransfer;
+        console.log('🔄 Main page was empty, using only selected recommendations');
+      } else {
+        // If main page has recommendations, replace them with selected ones
+        updatedRecommendations = recommendationsToTransfer;
+        console.log('🔄 Replacing main page recommendations with selected ones');
+      }
+      
+      console.log('🔄 Final updated recommendations:', updatedRecommendations);
+      
+      // Update the main page recommendations
+      currentRecs.updateRecommendations(updatedRecommendations);
+      console.log('✅ Main page recommendations updated');
+      
+      // Trigger main page refresh
+      console.log('🔄 Triggering main page refresh from chatbot...');
+      currentRecs.refreshMainPage();
+      console.log('✅ Main page refresh triggered');
+      
+      // Show success message with only selected recommendations
+      setCurrentMessage(
+        `✅ Perfect! Your selected recommendations have been transferred to the main page!\n\n` +
+        `**Transferred Recommendations:**\n${selectedRecs.map((rec, index) => 
+          `${index + 1}. **${rec.title}**\n   ${rec.specificAction}\n   Priority: ${rec.priority}\n`
+        ).join('\n')}\n\n` +
+        `💡 Your main page now shows these ${selectedRecs.length} personalized recommendations!\n\n` +
+        `🎯 Close this chatbot to see your updated recommendations on the main page.`
+      );
+      
+      // Change flow to show success message
+      dispatch({ type: 'SET_FLOW', flow: 'recommendations-accepted' });
+      
+      // Hide chatbot after 5 seconds to let user see the success message
+      setTimeout(() => {
+        hideChatbot();
+        // Clear the message and preview data after hiding
+        setTimeout(() => {
+          setCurrentMessage('');
+          setPreviewData(null);
+          setSelectedRecommendations(new Set()); // Reset selection
+        }, 100);
+      }, 5000);
+      
+    } catch (error) {
+      console.error('❌ Failed to update recommendations:', error);
+      setCurrentMessage("⚠️ Sorry, I couldn't update your recommendations. Please try again.");
+    }
   };
 
   const rejectRecommendationChanges = () => {
@@ -407,6 +549,51 @@ const Chatbot: React.FC = () => {
       // Clear the message after hiding
       setTimeout(() => setCurrentMessage(''), 100);
     }, 2000);
+  };
+
+  const revertPersonalization = () => {
+    try {
+      // Revert all personalized recommendations to their original state
+      const revertedRecommendations = currentRecs.currentRecommendations.map(rec => {
+        if (rec.isPersonalized && rec.originalTitle && rec.originalAction) {
+          return {
+            ...rec,
+            title: rec.originalTitle,
+            specificAction: rec.originalAction,
+            isPersonalized: false,
+            personalizationDate: undefined,
+            originalTitle: undefined,
+            originalAction: undefined
+          };
+        }
+        return rec;
+      });
+      
+      // Update the main page recommendations
+      currentRecs.updateRecommendations(revertedRecommendations);
+      
+      // Trigger main page refresh
+      console.log('🔄 Triggering main page refresh from revert...');
+      currentRecs.refreshMainPage();
+      console.log('✅ Main page refresh triggered from revert');
+      
+      setCurrentMessage(
+        `🔄 **Personalization Reverted!**\n\n` +
+        `Your recommendations have been restored to their original state.\n\n` +
+        `💡 You can now close this chatbot and see the original recommendations on your main page.`
+      );
+      
+      // Hide chatbot after 5 seconds
+      setTimeout(() => {
+        hideChatbot();
+        // Clear the message after hiding
+        setTimeout(() => setCurrentMessage(''), 100);
+      }, 5000);
+      
+    } catch (error) {
+      console.error('❌ Failed to revert personalization:', error);
+      setCurrentMessage("⚠️ Sorry, I couldn't revert your recommendations. Please try again.");
+    }
   };
 
   const suggestMoreAlternatives = async () => {
@@ -443,31 +630,7 @@ const Chatbot: React.FC = () => {
     }
   };
 
-  const generateAlternativeRecommendations = async (preferences: string[]): Promise<Array<{title: string, specificAction: string, priority: string}>> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Generate different alternative recommendations
-    const alternativeRecommendations = [
-      {
-        title: "Adaptogenic Herbs for Hormone Balance",
-        specificAction: "Take 500mg ashwagandha and 300mg rhodiola daily",
-        priority: "High"
-      },
-      {
-        title: "Fermented Foods for Gut Health",
-        specificAction: "Include 1 serving of kimchi, sauerkraut, or kefir daily",
-        priority: "Medium"
-      },
-      {
-        title: "Anti-inflammatory Spices",
-        specificAction: "Add turmeric, ginger, and cinnamon to meals daily",
-        priority: "Medium"
-      }
-    ];
-    
-    return alternativeRecommendations;
-  };
+  // First duplicate function removed - keeping the one at the end of the file
 
   if (!state.isVisible) {
     console.log('🚫 Chatbot not visible');
@@ -497,7 +660,7 @@ const Chatbot: React.FC = () => {
                 // Show accept/reject/suggest more buttons for immediate recommendations
                 <>
                   <button 
-                    onClick={() => handleImmediateRecommendationAction('accept')}
+                    onClick={() => handlePersonalizedRecommendationAction('accept')}
                     style={{ 
                       padding: '12px 24px', 
                       backgroundColor: '#28a745', 
@@ -510,10 +673,28 @@ const Chatbot: React.FC = () => {
                       fontWeight: '600'
                     }}
                   >
-                    ✅ I love these - Keep them
+                    ✅ Accept & Transfer to Main Page
                   </button>
+                  {currentRecs.currentRecommendations.some(rec => rec.isPersonalized) && (
+                    <button 
+                      onClick={revertPersonalization}
+                      style={{ 
+                        padding: '12px 24px', 
+                        backgroundColor: '#6c757d', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '8px', 
+                        cursor: 'pointer',
+                        fontSize: '16px',
+                        marginRight: '15px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      🔄 Revert to Original
+                    </button>
+                  )}
                   <button 
-                    onClick={() => handleImmediateRecommendationAction('suggest')}
+                    onClick={() => handlePersonalizedRecommendationAction('suggest')}
                     style={{ 
                       padding: '12px 24px', 
                       backgroundColor: '#ffc107', 
@@ -526,10 +707,10 @@ const Chatbot: React.FC = () => {
                       fontWeight: '600'
                     }}
                   >
-                    🔄 I'd like different options
+                    🔄 Generate Different Options
                   </button>
                   <button 
-                    onClick={() => handleImmediateRecommendationAction('reject')}
+                    onClick={() => handlePersonalizedRecommendationAction('reject')}
                     style={{ 
                       padding: '12px 24px', 
                       backgroundColor: '#dc3545', 
@@ -542,26 +723,8 @@ const Chatbot: React.FC = () => {
                       fontWeight: '600'
                     }}
                   >
-                    ❌ I prefer my current ones
+                    ❌ Keep Current Ones
                   </button>
-                  {previewData?.isMainPageUpdated && (
-                    <button 
-                      onClick={() => handleImmediateRecommendationAction('viewNew')}
-                      style={{ 
-                        padding: '12px 24px', 
-                        backgroundColor: '#17a2b8', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: '8px', 
-                        cursor: 'pointer',
-                        fontSize: '16px',
-                        fontWeight: '600',
-                        marginTop: '10px'
-                      }}
-                    >
-                      🎯 View New Recommendations
-                    </button>
-                  )}
                 </>
               ) : (
                 // Show regular close buttons
@@ -854,11 +1017,52 @@ const Chatbot: React.FC = () => {
           <div className={styles.buttonGroup}>
             <button 
               className={styles.submitButton}
-              onClick={handleRestrictionSubmit}
-              disabled={selectedRestrictionTypes.length === 0}
+              onClick={() => {
+                console.log('🔘 Submit button clicked!');
+                console.log('🔍 Current state when submit clicked:');
+                console.log('  - selectedOptions:', selectedOptions);
+                console.log('  - weather:', weather);
+                console.log('  - culture:', culture);
+                console.log('  - other:', other);
+                console.log('  - location:', location);
+                console.log('  - showInputs:', showInputs);
+                console.log('🔍 Button is responding!');
+                handleRestrictionSubmit();
+              }}
+              disabled={selectedRestrictionTypes.length === 0 || isGeneratingRecommendations}
+              style={{
+                opacity: (selectedRestrictionTypes.length === 0 || isGeneratingRecommendations) ? 0.5 : 1,
+                cursor: (selectedRestrictionTypes.length === 0 || isGeneratingRecommendations) ? 'not-allowed' : 'pointer'
+              }}
             >
-              ✅ Submit Preferences
+              {isGeneratingRecommendations ? (
+                '⏳ Processing...'
+              ) : (
+                `✅ Submit Preferences ${selectedRestrictionTypes.length > 0 ? `(${selectedRestrictionTypes.length} selected)` : '(none selected)'}`
+              )}
             </button>
+            
+            {/* Test loading button */}
+            <button 
+              className={styles.testButton}
+              onClick={() => {
+                console.log('🧪 Test loading button clicked');
+                console.log('🧪 Setting loading to TRUE');
+                setIsGeneratingRecommendations(true);
+                console.log('🧪 Loading state set to:', true);
+                
+                // Test with a simple timeout
+                setTimeout(() => {
+                  console.log('🧪 Test loading timeout - setting to false');
+                  setIsGeneratingRecommendations(false);
+                  console.log('🧪 Loading state set to:', false);
+                }, 3000);
+              }}
+              style={{ marginLeft: '10px', padding: '8px 16px', backgroundColor: '#ff6b6b', color: 'white', border: 'none', borderRadius: '8px' }}
+            >
+              🧪 Test Loading
+            </button>
+            
             <button 
               className={styles.backButton}
               onClick={() => setShowInputs(false)}
@@ -880,9 +1084,13 @@ const Chatbot: React.FC = () => {
             className={`${styles.optionCard} ${selectedRestrictionTypes.includes('allergies') ? styles.selected : ''}`}
             onClick={() => {
               if (selectedRestrictionTypes.includes('allergies')) {
-                setSelectedRestrictionTypes(selectedRestrictionTypes.filter(type => type !== 'allergies'));
+                const newTypes = selectedRestrictionTypes.filter(type => type !== 'allergies');
+                setSelectedRestrictionTypes(newTypes);
+                setSelectedOptions(newTypes); // Sync with selectedOptions
               } else {
-                setSelectedRestrictionTypes([...selectedRestrictionTypes, 'allergies']);
+                const newTypes = [...selectedRestrictionTypes, 'allergies'];
+                setSelectedRestrictionTypes(newTypes);
+                setSelectedOptions(newTypes); // Sync with selectedOptions
               }
             }}
           >
@@ -895,9 +1103,13 @@ const Chatbot: React.FC = () => {
             className={`${styles.optionCard} ${selectedRestrictionTypes.includes('diet') ? styles.selected : ''}`}
             onClick={() => {
               if (selectedRestrictionTypes.includes('diet')) {
-                setSelectedRestrictionTypes(selectedRestrictionTypes.filter(type => type !== 'diet'));
+                const newTypes = selectedRestrictionTypes.filter(type => type !== 'diet');
+                setSelectedRestrictionTypes(newTypes);
+                setSelectedOptions(newTypes); // Sync with selectedOptions
               } else {
-                setSelectedRestrictionTypes([...selectedRestrictionTypes, 'diet']);
+                const newTypes = [...selectedRestrictionTypes, 'diet'];
+                setSelectedRestrictionTypes(newTypes);
+                setSelectedOptions(newTypes); // Sync with selectedOptions
               }
             }}
           >
@@ -910,9 +1122,13 @@ const Chatbot: React.FC = () => {
             className={`${styles.optionCard} ${selectedRestrictionTypes.includes('culture') ? styles.selected : ''}`}
             onClick={() => {
               if (selectedRestrictionTypes.includes('culture')) {
-                setSelectedRestrictionTypes(selectedRestrictionTypes.filter(type => type !== 'culture'));
+                const newTypes = selectedRestrictionTypes.filter(type => type !== 'culture');
+                setSelectedRestrictionTypes(newTypes);
+                setSelectedOptions(newTypes); // Sync with selectedOptions
               } else {
-                setSelectedRestrictionTypes([...selectedRestrictionTypes, 'culture']);
+                const newTypes = [...selectedRestrictionTypes, 'culture'];
+                setSelectedRestrictionTypes(newTypes);
+                setSelectedOptions(newTypes); // Sync with selectedOptions
               }
             }}
           >
@@ -925,14 +1141,18 @@ const Chatbot: React.FC = () => {
             className={`${styles.optionCard} ${selectedRestrictionTypes.includes('other') ? styles.selected : ''}`}
             onClick={() => {
               if (selectedRestrictionTypes.includes('other')) {
-                setSelectedRestrictionTypes(selectedRestrictionTypes.filter(type => type !== 'other'));
+                const newTypes = selectedRestrictionTypes.filter(type => type !== 'other');
+                setSelectedRestrictionTypes(newTypes);
+                setSelectedOptions(newTypes); // Sync with selectedOptions
               } else {
-                setSelectedRestrictionTypes([...selectedRestrictionTypes, 'other']);
+                const newTypes = [...selectedRestrictionTypes, 'other'];
+                setSelectedRestrictionTypes(newTypes);
+                setSelectedOptions(newTypes); // Sync with selectedOptions
               }
             }}
           >
             <div className={styles.optionIcon}>📝</div>
-            <div className={styles.optionText}>Other</div>
+            <div className={styles.optionText}>Other (specify)</div>
             {selectedRestrictionTypes.includes('other') && <div className={styles.checkmark}>✓</div>}
           </div>
         </div>
@@ -940,17 +1160,29 @@ const Chatbot: React.FC = () => {
         <div className={styles.nextStepButton}>
           <button 
             className={styles.nextButton}
-            onClick={() => setShowInputs(true)}
-            disabled={selectedRestrictionTypes.length === 0}
+            onClick={() => {
+              console.log('🚀 Next Step button clicked!');
+              console.log('🔍 Current selectedOptions:', selectedOptions);
+              console.log('🔍 Current showInputs:', showInputs);
+              setShowInputs(true);
+              console.log('🔍 After setting showInputs to true');
+            }}
+            disabled={selectedOptions.length === 0}
           >
-            🚀 Next Step: Provide Details
+            🚀 Next Step: Provide Details {selectedOptions.length > 0 ? `(${selectedOptions.length} selected)` : '(none selected)'}
           </button>
         </div>
       </div>
     );
   };
 
-  const handleRestrictionSubmit = () => {
+  const handleRestrictionSubmit = async () => {
+    // Prevent multiple clicks while processing
+    if (isGeneratingRecommendations) {
+      console.log('🚫 Already generating recommendations, ignoring click');
+      return;
+    }
+    
     console.log('🚀 Submit button clicked!');
     console.log('📊 Current state:', {
       selectedRestrictionTypes,
@@ -983,17 +1215,48 @@ const Chatbot: React.FC = () => {
       return;
     }
     
-    // Store preferences in chatbot state
-    dispatch({ type: 'SET_PERSONALIZATION_PREFERENCES', preferences });
-    
+    // Set loading state
+    setIsGeneratingRecommendations(true);
+    setRetryAttempt(0); // Reset retry attempt
     setCurrentMessage("🎯 Personalizing according to your restrictions... Generating safe recommendations for you! ✨");
     
-    // Show the message for 2 seconds, then hide chatbot
-    setTimeout(() => {
-      hideChatbot();
-      // Clear the message after hiding
-      setTimeout(() => setCurrentMessage(''), 100);
-    }, 2000);
+    try {
+      // Generate personalized recommendations
+      console.log('🔄 Calling generatePersonalizedRecommendations...');
+      const personalizedRecommendations = await generatePersonalizedRecommendations(preferences);
+      console.log('✅ Generated recommendations:', personalizedRecommendations);
+      
+      // Store the recommendations and preferences for display
+      const previewData = {
+        preferences,
+        recommendations: personalizedRecommendations,
+        isMainPageUpdated: false
+      };
+      
+      setPreviewData(previewData);
+      setSelectedRecommendations(new Set()); // Reset selection
+      
+      // Show the personalized recommendations
+      setCurrentMessage(
+        `🎉 **Successfully Generated Personalized Recommendations!**\n\n` +
+        `**Your Preferences:** ${preferences.join(', ')}\n\n` +
+        `**Generated Recommendations:**\n${personalizedRecommendations.map((rec, index) => 
+          `${index + 1}. **${rec.title}**\n   ${rec.specificAction}\n   Priority: ${rec.priority}\n`
+        ).join('\n')}\n\n` +
+        `💡 These recommendations are tailored to your specific restrictions and health profile!\n\n` +
+        `🎯 You can now select which recommendations to transfer to your main page.`
+      );
+      
+      // Change flow to show personalized recommendations
+      dispatch({ type: 'SET_FLOW', flow: 'personalized-recommendations' });
+      
+    } catch (error) {
+      console.error('❌ Failed to generate recommendations:', error);
+      setCurrentMessage("⚠️ Sorry, I couldn't generate personalized recommendations. Please try again.");
+    } finally {
+      // Clear loading state
+      setIsGeneratingRecommendations(false);
+    }
   };
 
     const renderAllergiesOptions = () => (
@@ -1069,7 +1332,13 @@ const Chatbot: React.FC = () => {
         <label>🌍 What&apos;s your cultural background?</label>
         <select
           value={cultureEthnicity}
-          onChange={(e) => setCultureEthnicity(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            setCultureEthnicity(value);
+            // Sync with culture state for consistency
+            setCulture(value);
+            console.log('🌍 Cultural background selected:', value);
+          }}
           className={styles.selectInput}
         >
           <option value="">Select your culture/ethnicity</option>
@@ -1110,336 +1379,104 @@ const Chatbot: React.FC = () => {
     console.log('📍 Location:', location);
     console.log('🌤️ Weather:', weather);
     console.log('🌍 Culture:', culture);
+    console.log('🌍 Culture Ethnicity:', cultureEthnicity);
     console.log('📝 Other:', other);
+    console.log('🔍 Selected options:', selectedOptions);
+    console.log('🔍 Selected options length:', selectedOptions.length);
+    console.log('🔍 Show inputs:', showInputs);
     
+    // Check if user has filled in the form fields for their selected options
     const preferences = [];
-    if (location) preferences.push(`Location: ${location}`);
-    if (weather) preferences.push(`Weather: ${weather}`);
-    if (culture) preferences.push(`Culture: ${culture}`);
-    if (other) preferences.push(`Other: ${other}`);
+    let hasValidInputs = false;
+    
+    if (selectedOptions.includes('Location') && location && location.trim()) {
+      preferences.push(`Location: ${location}`);
+      hasValidInputs = true;
+    }
+    
+    if (selectedOptions.includes('Weather') && weather && weather.trim()) {
+      preferences.push(`Weather: ${weather}`);
+      hasValidInputs = true;
+    }
+    
+    // Fix: Check both culture and cultureEthnicity variables
+    if (selectedOptions.includes('Culture/ethnicity')) {
+      const cultureValue = culture || cultureEthnicity;
+      if (cultureValue && cultureValue.trim()) {
+        preferences.push(`Culture: ${cultureValue}`);
+        hasValidInputs = true;
+      }
+    }
+    
+    if (selectedOptions.includes('Other') && other && other.trim()) {
+      preferences.push(`Other: ${other}`);
+      hasValidInputs = true;
+    }
     
     console.log('📋 Collected preferences:', preferences);
+    console.log('📋 Preferences length:', preferences.length);
+    console.log('✅ Has valid inputs:', hasValidInputs);
+    
+    if (!hasValidInputs) {
+      console.log('❌ No valid preferences collected, showing error message');
+      setCurrentMessage("⚠️ Please fill in the form fields for your selected options before submitting.");
+      return;
+    }
+    
+    console.log('✅ Preferences collected successfully, proceeding to generate recommendations');
     
     // Store preferences in chatbot state
     dispatch({ type: 'SET_PERSONALIZATION_PREFERENCES', preferences });
     
-    // Immediately show new recommendations without requiring approval first
-    showImmediateRecommendations(preferences);
+    // Show personalized recommendations in chatbot
+    showPersonalizedRecommendationsInChatbot(preferences);
   };
 
-  const showImmediateRecommendations = async (preferences: string[]) => {
+  const showPersonalizedRecommendationsInChatbot = async (preferences: string[]) => {
     try {
+      console.log('🎯 Starting to generate personalized recommendations...');
+      console.log('📋 Preferences received:', preferences);
+      
       setCurrentMessage("🎯 Generating personalized recommendations based on your preferences...");
       
-      // Get current recommendations for comparison
-      const currentFoodRecs = currentRecs.currentRecommendations.filter(rec => rec.category === 'food');
+      // Generate personalized recommendations
+      console.log('🔄 Calling generatePersonalizedRecommendations...');
+      const personalizedRecommendations = await generatePersonalizedRecommendations(preferences);
+      console.log('✅ Generated recommendations:', personalizedRecommendations);
       
-      // Generate new recommendations based on preferences
-      const newRecommendations = await generatePersonalizedRecommendations(preferences);
-      
-      // Show the new recommendations immediately
-      const recommendationsMessage = createImmediateRecommendationsDisplay(
-        newRecommendations, 
+      // Show the recommendations in chatbot with accept/reject options
+      console.log('🔄 Creating recommendations display...');
+      const recommendationsMessage = createPersonalizedRecommendationsDisplay(
+        personalizedRecommendations, 
         preferences
       );
+      console.log('✅ Recommendations message created');
       
       setCurrentMessage(recommendationsMessage);
+      console.log('✅ Message set in chatbot');
       
-      // Store the recommendations data for potential future use
-      setPreviewData({ preferences, recommendations: newRecommendations });
+      // Store the recommendations data for potential transfer to main page
+      const newPreviewData = { 
+        preferences, 
+        recommendations: personalizedRecommendations,
+        isMainPageUpdated: false // Will be set to true when user accepts
+      };
+      setPreviewData(newPreviewData);
+      console.log('✅ Preview data set:', newPreviewData);
+      console.log('🔍 previewData state after set:', newPreviewData);
       
-      // Also reload the main page recommendations with new preferences
-      await reloadMainPageRecommendations(preferences);
+      // Change flow to show recommendations with accept/reject options
+      console.log('🔄 Changing flow to personalized-recommendations...');
+      dispatch({ type: 'SET_FLOW', flow: 'personalized-recommendations' });
+      console.log('✅ Flow changed to personalized-recommendations');
       
     } catch (error) {
-      console.error('❌ Failed to generate recommendations:', error);
+      console.error('❌ Failed to generate personalized recommendations:', error);
       setCurrentMessage("⚠️ Sorry, I couldn't generate personalized recommendations right now. Please try again.");
     }
   };
 
-  // Function to reload main page recommendations based on user preferences
-  const reloadMainPageRecommendations = async (preferences: string[]) => {
-    try {
-      console.log('🔄 Reloading main page recommendations with preferences:', preferences);
-      
-      // Create a comprehensive prompt for the LLM
-      const prompt = createLLMPromptForRecommendations(preferences);
-      
-      // Call the LLM API to get new recommendations
-      const response = await fetch('/api/llm-recommendations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: prompt,
-          preferences: preferences
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('🤖 LLM response for new recommendations:', data);
-      
-      // Update the current recommendations context with new recommendations
-      if (data.recommendations && Array.isArray(data.recommendations)) {
-        console.log('✅ Updating recommendations context with new data');
-        
-        // Update the current recommendations context
-        currentRecs.updateRecommendations(data.recommendations);
-        
-        // Show success message with option to view new recommendations
-        setCurrentMessage(prev => prev + '\n\n🎯 **Your main page recommendations have been updated!**\n\n' +
-          '**New personalized recommendations are now active on the main page.**\n\n' +
-          '**Options:**\n' +
-          '✅ **View New Recommendations** - See your updated recommendations\n' +
-          '🔄 **Generate Different Options** - Get alternative suggestions\n' +
-          '❌ **Keep Current Ones** - Revert to previous recommendations');
-        
-        // Store the new recommendations for potential use
-        setPreviewData({ 
-          preferences, 
-          recommendations: data.recommendations,
-          isMainPageUpdated: true 
-        });
-        
-      } else {
-        console.log('❌ No recommendations data in LLM response');
-        setCurrentMessage(prev => prev + '\n\n⚠️ **Could not update main page recommendations.**\n\nPlease try again or contact support.');
-      }
-      
-    } catch (error) {
-      console.error('❌ Failed to reload main page recommendations:', error);
-      setCurrentMessage(prev => prev + '\n\n⚠️ **Failed to update main page recommendations.**\n\nPlease try again later.');
-    }
-  };
-
-  const createLLMPromptForRecommendations = (preferences: string[]) => {
-    let prompt = `Generate personalized hormone health recommendations considering the following factors:\n\n`;
-    
-    // Add user's preferences
-    prompt += `**User's Preferences:**\n`;
-    preferences.forEach(pref => {
-      prompt += `• ${pref}\n`;
-    });
-    prompt += `\n`;
-    
-    // Add specific instructions for weather-based recommendations
-    if (preferences.some(p => p.startsWith('Weather:'))) {
-      const weather = preferences.find(p => p.startsWith('Weather:'))?.split(': ')[1];
-      if (weather?.toLowerCase().includes('hot')) {
-        prompt += `**Special Instructions for Hot Weather:**\n`;
-        prompt += `• Suggest cooling, hydrating foods and drinks that support hormone balance\n`;
-        prompt += `• Include spearmint tea, cucumber-mint water, coconut water\n`;
-        prompt += `• Focus on light, cooling proteins and hydrating fruits\n`;
-        prompt += `• Consider foods that help with heat management and hormone regulation\n\n`;
-      } else if (weather?.toLowerCase().includes('cold')) {
-        prompt += `**Special Instructions for Cold Weather:**\n`;
-        prompt += `• Suggest warming, nourishing foods that support hormone balance\n`;
-        prompt += `• Include ginger, cinnamon, turmeric tea\n`;
-        prompt += `• Focus on root vegetables, warming spices, and hearty soups\n`;
-        prompt += `• Consider foods that provide warmth and hormone support\n\n`;
-      }
-    }
-    
-    // Add culture-based instructions
-    if (preferences.some(p => p.startsWith('Culture:'))) {
-      prompt += `**Cultural Considerations:**\n`;
-      prompt += `• Incorporate traditional foods and cooking methods from the user's cultural background\n`;
-      prompt += `• Adapt recommendations to cultural dietary preferences\n`;
-      prompt += `• Include culturally relevant hormone-balancing foods\n\n`;
-    }
-    
-    prompt += `**Requirements:**\n`;
-    prompt += `• Generate 3-4 food recommendations\n`;
-    prompt += `• Generate 2-3 movement recommendations\n`;
-    prompt += `• Generate 2-3 mindfulness recommendations\n`;
-    prompt += `• All recommendations should support hormone balance\n`;
-    prompt += `• Make recommendations practical and actionable\n`;
-    prompt += `• Consider the user's location, weather, and cultural background\n\n`;
-    
-    prompt += `Format the response as a JSON object with categories: food, movement, mindfulness.`;
-    
-    return prompt;
-  };
-
-  const generatePersonalizedRecommendations = async (preferences: string[]): Promise<Array<{title: string, specificAction: string, priority: string}>> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Generate more specific recommendations based on preferences
-    const recommendations = [];
-    
-    // Location-based recommendations
-    if (preferences.some(p => p.startsWith('Location:'))) {
-      recommendations.push({
-        title: "Local Seasonal Produce",
-        specificAction: "Visit local farmers markets for fresh, seasonal vegetables and fruits",
-        priority: "High"
-      });
-      
-      if (preferences.some(p => p.includes('CA') || p.includes('California'))) {
-        recommendations.push({
-          title: "California Avocados & Citrus",
-          specificAction: "Include 1/2 avocado and 1 citrus fruit daily for hormone balance",
-          priority: "Medium"
-        });
-      }
-    }
-    
-    // Enhanced Weather-based recommendations with hormone-friendly considerations
-    if (preferences.some(p => p.startsWith('Weather:'))) {
-      const weather = preferences.find(p => p.startsWith('Weather:'))?.split(': ')[1];
-      
-      if (weather?.toLowerCase().includes('hot') || weather?.toLowerCase().includes('summer')) {
-        // Hot weather - cooling, hydrating foods that support hormone balance
-        recommendations.push({
-          title: "Cooling Hormone-Friendly Drinks",
-          specificAction: "Drink 2-3 cups of spearmint tea, cucumber-mint water, or coconut water daily to cool your body and support hormone regulation",
-          priority: "High"
-        });
-        
-        recommendations.push({
-          title: "Hydrating Summer Fruits",
-          specificAction: "Include watermelon, berries, and citrus fruits daily for hydration and antioxidant support for hormone health",
-          priority: "Medium"
-        });
-        
-        recommendations.push({
-          title: "Light Cooling Proteins",
-          specificAction: "Choose lighter proteins like grilled fish, tofu, or lean chicken with cooling herbs like mint and cilantro",
-          priority: "Medium"
-        });
-        
-      } else if (weather?.toLowerCase().includes('cold') || weather?.toLowerCase().includes('winter')) {
-        // Cold weather - warming, nourishing foods that support hormone balance
-        recommendations.push({
-          title: "Warming Hormone-Supporting Herbs",
-          specificAction: "Drink 2-3 cups of ginger, cinnamon, or turmeric tea daily to warm your body and support hormone regulation",
-          priority: "High"
-        });
-        
-        recommendations.push({
-          title: "Nourishing Winter Root Vegetables",
-          specificAction: "Include sweet potatoes, carrots, and beets daily for warming energy and hormone-supporting nutrients",
-          priority: "Medium"
-        });
-        
-        recommendations.push({
-          title: "Warming Spices & Soups",
-          specificAction: "Use warming spices like ginger, cinnamon, and black pepper in soups and stews for hormone balance",
-          priority: "Medium"
-        });
-        
-      } else if (weather?.toLowerCase().includes('humid')) {
-        // Humid weather - foods that help with moisture regulation and hormone balance
-        recommendations.push({
-          title: "Moisture-Balancing Foods",
-          specificAction: "Include bitter greens, cucumber, and light proteins to help balance moisture and support hormone regulation",
-          priority: "High"
-        });
-        
-        recommendations.push({
-          title: "Light Digestive Support",
-          specificAction: "Include ginger tea, fennel seeds, and light meals to support digestion in humid conditions",
-          priority: "Medium"
-        });
-        
-      } else if (weather?.toLowerCase().includes('dry')) {
-        // Dry weather - hydrating and nourishing foods
-        recommendations.push({
-          title: "Hydrating Hormone Support",
-          specificAction: "Drink 3-4 cups of herbal teas (chamomile, spearmint) and include hydrating foods like cucumber and watermelon",
-          priority: "High"
-        });
-        
-        recommendations.push({
-          title: "Nourishing Healthy Fats",
-          specificAction: "Include avocado, nuts, and olive oil daily to support hormone production in dry conditions",
-          priority: "Medium"
-        });
-      }
-    }
-    
-    // Enhanced Culture-based recommendations
-    if (preferences.some(p => p.startsWith('Culture:'))) {
-      const culture = preferences.find(p => p.startsWith('Culture:'))?.split(': ')[1];
-      if (culture?.toLowerCase().includes('indian')) {
-        recommendations.push({
-          title: "Traditional Indian Hormone-Balancing Spices",
-          specificAction: "Use turmeric, cumin, coriander, and fenugreek in daily cooking for hormone regulation and digestive health",
-          priority: "High"
-        });
-        
-        recommendations.push({
-          title: "Ayurvedic Cooling Foods",
-          specificAction: "Include cooling foods like cucumber raita, mint chutney, and coconut-based dishes for hormone balance",
-          priority: "Medium"
-        });
-        
-      } else if (culture?.toLowerCase().includes('mediterranean')) {
-        recommendations.push({
-          title: "Mediterranean Hormone-Supporting Diet",
-          specificAction: "Include olive oil, nuts, fatty fish, and plenty of vegetables 3-4 times per week for hormone balance",
-          priority: "High"
-        });
-        
-        recommendations.push({
-          title: "Greek Yogurt & Fermented Foods",
-          specificAction: "Include Greek yogurt, olives, and fermented vegetables daily for gut health and hormone regulation",
-          priority: "Medium"
-        });
-        
-      } else if (culture?.toLowerCase().includes('asian')) {
-        recommendations.push({
-          title: "Asian Healing Foods for Hormones",
-          specificAction: "Include ginger, green tea, miso, and fermented foods daily for hormone balance and digestive health",
-          priority: "High"
-        });
-        
-        recommendations.push({
-          title: "Traditional Asian Herbs",
-          specificAction: "Use herbs like ginseng, astragalus, and goji berries in teas or soups for hormone support",
-          priority: "Medium"
-        });
-      }
-    }
-    
-    // Core hormone-balancing recommendations (always included)
-    recommendations.push({
-      title: "Omega-3 Rich Foods for Hormone Balance",
-      specificAction: "Include fatty fish (salmon, sardines), flaxseeds, or walnuts 3-4 times per week for hormone regulation",
-      priority: "High"
-    });
-    
-    recommendations.push({
-      title: "Probiotic-Rich Foods for Gut-Hormone Axis",
-      specificAction: "Include yogurt, kefir, or fermented vegetables daily to support gut health and hormone regulation",
-      priority: "High"
-    });
-    
-    recommendations.push({
-      title: "Fiber-Rich Foods for Hormone Metabolism",
-      specificAction: "Include 25-30g of fiber daily from vegetables, fruits, and whole grains for proper hormone metabolism",
-      priority: "Medium"
-    });
-    
-    // Ensure we have at least 5 recommendations
-    while (recommendations.length < 5) {
-      recommendations.push({
-        title: "Balanced Hormone-Supporting Meals",
-        specificAction: "Plan meals with lean protein, healthy fats, complex carbs, and plenty of vegetables for hormone balance",
-        priority: "Medium"
-      });
-    }
-    
-    return recommendations.slice(0, 6); // Return max 6 recommendations
-  };
-
-  const createImmediateRecommendationsDisplay = (
+  const createPersonalizedRecommendationsDisplay = (
     recommendations: Array<{title: string, specificAction: string, priority: string}>,
     preferences: string[]
   ) => {
@@ -1448,77 +1485,354 @@ const Chatbot: React.FC = () => {
     ).join('\n');
 
     return `🎯 **Your Personalized Recommendations**\n\n` +
-           `**Based on your preferences:** ${preferences.join(', ')}\n\n` +
-           `**🆕 Your NEW personalized recommendations:**\n${recommendationsList}\n\n` +
-           `**What's special about these:**\n` +
-           `• Tailored to your location and preferences\n` +
-           `• Consider your cultural background\n` +
-           `• Optimized for your current situation\n\n` +
-           `**Next steps:**\n` +
-           `✅ I love these - Keep them\n` +
-           `🔄 I'd like different options\n` +
-           `❌ I prefer my current ones\n\n` +
-           `**🔄 Main page recommendations are being updated with your preferences!**`;
+           `**Based on:** ${preferences.join(', ')}\n\n` +
+           `${recommendationsList}\n\n` +
+           `**Choose an option below:**`;
   };
 
-  // Update the action buttons for immediate recommendations
-  const handleImmediateRecommendationAction = (action: 'accept' | 'reject' | 'suggest' | 'viewNew') => {
-    if (action === 'accept') {
-      setCurrentMessage(
-        `✅ Perfect! Your personalized recommendations are now active:\n\n` +
-        `**Your Approved Recommendations:**\n${previewData?.recommendations.map((rec, index) => 
-          `${index + 1}. **${rec.title}**\n   ${rec.specificAction}\n   Priority: ${rec.priority}\n`
-        ).join('\n')}\n\n` +
-        `💡 These recommendations are personalized for your preferences and ready to use!\n\n` +
-        `**Note:** These are shown in the chatbot only. Your main page remains unchanged to save costs.`
-      );
-      
-      // Clear preview data and hide after 5 seconds
-      setTimeout(() => {
-        setPreviewData(null);
-        hideChatbot();
-        setTimeout(() => setCurrentMessage(''), 100);
-      }, 5000);
-      
-    } else if (action === 'reject') {
-      setCurrentMessage("❌ Got it! Your current recommendations stay the same. No changes were made.");
-      
-      // Clear preview data and hide after 2 seconds
-      setTimeout(() => {
-        setPreviewData(null);
-        hideChatbot();
-        setTimeout(() => setCurrentMessage(''), 100);
-      }, 2000);
-      
-    } else if (action === 'suggest') {
-      // Generate new alternatives
-      suggestMoreAlternatives();
-      
-    } else if (action === 'viewNew') {
-      // Show the new recommendations that are now active on the main page
-      if (previewData?.isMainPageUpdated) {
-        setCurrentMessage(
-          `🎯 **Your Updated Main Page Recommendations**\n\n` +
-          `**These recommendations are now active on the main page:**\n\n` +
-          `**Food Recommendations:**\n${currentRecs.currentRecommendations.filter(rec => rec.category === 'food').map((rec, index) => 
-            `${index + 1}. **${rec.title || 'Food Item'}**\n   ${rec.specificAction || 'Action'}\n`
-          ).join('\n')}\n\n` +
-          `**Movement Recommendations:**\n${currentRecs.currentRecommendations.filter(rec => rec.category === 'movement').map((rec, index) => 
-            `${index + 1}. **${rec.title || 'Movement Item'}**\n   ${rec.specificAction || 'Action'}\n`
-          ).join('\n')}\n\n` +
-          `**Mindfulness Recommendations:**\n${currentRecs.currentRecommendations.filter(rec => rec.category === 'mindfulness').map((rec, index) => 
-            `${index + 1}. **${rec.title || 'Mindfulness Item'}**\n   ${rec.specificAction || 'Action'}\n`
-          ).join('\n')}\n\n` +
-          `💡 **Your main page has been updated with these personalized recommendations!**\n\n` +
-          `**Options:**\n` +
-          `🔄 **Generate Different Options** - Get alternative suggestions\n` +
-          `✅ **Perfect!** - Keep these recommendations\n` +
-          `❌ **Revert Changes** - Go back to previous recommendations`
-        );
-      } else {
-        setCurrentMessage("⚠️ No updated recommendations found. Please try submitting your preferences again.");
+  const generatePersonalizedRecommendations = async (preferences: string[]): Promise<Array<{title: string, specificAction: string, priority: string}>> => {
+    console.log('🔄 generatePersonalizedRecommendations called with preferences:', preferences);
+    console.log('👤 User health profile:', state.userProfile);
+    console.log('🔍 State object:', state);
+    console.log('🔍 User profile details:');
+    console.log('  - Hormone scores:', state.userProfile.hormoneScores);
+    console.log('  - Primary imbalance:', state.userProfile.primaryImbalance);
+    console.log('  - Secondary imbalances:', state.userProfile.secondaryImbalances);
+    console.log('  - Conditions:', state.userProfile.conditions);
+    console.log('  - Symptoms:', state.userProfile.symptoms);
+    console.log('  - Cycle phase:', state.userProfile.cyclePhase);
+    console.log('  - Birth control:', state.userProfile.birthControlStatus);
+    console.log('  - Age:', state.userProfile.age);
+    console.log('  - Ethnicity:', state.userProfile.ethnicity);
+    console.log('  - Cravings:', state.userProfile.cravings);
+    console.log('  - Confidence:', state.userProfile.confidence);
+    
+    const maxRetries = 3;
+    let attempt = 1;
+    
+    while (attempt <= maxRetries) {
+      try {
+        console.log(`🔄 Attempt ${attempt} of ${maxRetries} to generate recommendations`);
+        
+        // Update retry attempt state for UI feedback
+        if (attempt > 1) {
+          setRetryAttempt(attempt);
+        }
+        
+        // Get user's comprehensive health profile data
+        const { symptoms, conditions, primaryImbalance, secondaryImbalances, hormoneScores, cyclePhase, birthControlStatus, age, ethnicity, cravings, confidence } = state.userProfile;
+        
+        // Prepare comprehensive user profile for LLM
+        const userProfileForLLM = {
+          symptoms: symptoms || [],
+          conditions: conditions || [],
+          primaryHormoneImbalance: primaryImbalance || '',
+          secondaryHormoneImbalances: secondaryImbalances || [],
+          hormoneScores: hormoneScores || {},
+          cyclePhase: cyclePhase || 'unknown',
+          birthControlStatus: birthControlStatus || 'No',
+          age: age || undefined,
+          ethnicity: ethnicity || undefined,
+          cravings: cravings || [],
+          confidenceLevel: confidence || 'low',
+          preferences: preferences,
+          // Add any additional context that might be relevant
+          currentRecommendations: currentRecs.currentRecommendations || []
+        };
+        
+        console.log('📋 Comprehensive user profile for LLM:', userProfileForLLM);
+        
+        // Call the LLM API to generate personalized recommendations
+        console.log('🤖 Calling LLM API for personalized recommendations...');
+        
+        // Create a timeout promise
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000);
+        });
+        
+        // Create the fetch promise
+        const fetchPromise = fetch('/api/llm-recommendations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userProfile: userProfileForLLM,
+            category: 'food', // Focus on food recommendations for now
+            personalizationContext: {
+              type: 'chatbot-personalization',
+              preferences: preferences,
+              source: 'user-input'
+            }
+          }),
+        });
+        
+        // Race between fetch and timeout
+        const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+        
+        if (!response.ok) {
+          throw new Error(`LLM API call failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('🤖 LLM API response:', data);
+        
+        if (!data.recommendations || !Array.isArray(data.recommendations)) {
+          throw new Error('LLM API returned invalid recommendations format');
+        }
+        
+        // Transform LLM recommendations to the expected format
+        const transformedRecommendations = data.recommendations.map((rec: any, index: number) => ({
+          title: rec.title || `Personalized Recommendation ${index + 1}`,
+          specificAction: rec.specificAction || rec.action || 'Follow personalized guidance',
+          priority: rec.priority || rec.importance || 'Medium'
+        }));
+        
+        console.log('✅ Transformed LLM recommendations:', transformedRecommendations);
+        
+        // Ensure we have at least some recommendations
+        if (transformedRecommendations.length === 0) {
+          console.log('⚠️ No recommendations from LLM, generating fallback recommendations');
+          
+          // Generate fallback recommendations based on user profile
+          const fallbackRecommendations = [];
+          
+          if (symptoms && symptoms.length > 0) {
+            fallbackRecommendations.push({
+              title: "Personalized Health Support",
+              specificAction: `Focus on addressing: ${symptoms.slice(0, 3).join(', ')}`,
+              priority: "High"
+            });
+          }
+          
+          if (primaryImbalance) {
+            fallbackRecommendations.push({
+              title: "Hormone Balance Support",
+              specificAction: `Target ${primaryImbalance} imbalance with personalized nutrition`,
+              priority: "High"
+            });
+          }
+          
+          if (preferences.length > 0) {
+            fallbackRecommendations.push({
+              title: "Preference-Based Nutrition",
+              specificAction: `Customize diet based on: ${preferences.slice(0, 2).join(', ')}`,
+              priority: "Medium"
+            });
+          }
+          
+          // Add generic but personalized recommendations
+          fallbackRecommendations.push({
+            title: "Daily Health Routine",
+            specificAction: "Establish consistent daily habits based on your health profile",
+            priority: "Medium"
+          });
+          
+          return fallbackRecommendations;
+        }
+        
+        return transformedRecommendations;
+        
+      } catch (error) {
+        console.error(`❌ Attempt ${attempt} failed:`, error);
+        
+        if (attempt === maxRetries) {
+          console.error('❌ All retry attempts failed');
+          throw error;
+        }
+        
+        // Wait before retrying (exponential backoff)
+        const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+        console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        attempt++;
       }
     }
+    
+    // This should never be reached, but just in case
+    throw new Error('Failed to generate recommendations after all retry attempts');
+  };
+
+  const renderRecommendationsAcceptedFlow = () => {
+    return (
+      <div className={styles.flowContainer}>
+        <div className={styles.botMessage}>
+          <div dangerouslySetInnerHTML={{ __html: currentMessage.replace(/\n/g, '<br/>') }} />
+        </div>
+        
+        <div className={styles.buttonGroup}>
+          <button 
+            className={styles.closeButton}
+            onClick={hideChatbot}
+          >
+            ✅ Close Chatbot
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPersonalizedRecommendationsFlow = () => {
+    console.log('🎭 renderPersonalizedRecommendationsFlow called');
+    console.log('📋 previewData:', previewData);
+    console.log('💬 currentMessage:', currentMessage);
+    console.log('🔍 selectedRecommendations:', selectedRecommendations);
+    console.log('🔍 selectedRecommendations size:', selectedRecommendations.size);
+    
+    if (!previewData) {
+      console.log('❌ No previewData found');
+      return (
+        <div className={styles.flowContainer}>
+          <div className={styles.botMessage}>
+            <strong>⚠️ No recommendations data found.</strong>
+            <br />
+            Please go back and generate recommendations first.
+          </div>
+          <div className={styles.buttonGroup}>
+            <button 
+              className={styles.backButton}
+              onClick={() => dispatch({ type: 'SET_FLOW', flow: 'personalization-options' })}
+            >
+              🔙 Back to Options
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    console.log('✅ previewData found, rendering recommendations');
+    console.log('🔍 Number of recommendations:', previewData.recommendations.length);
+    
+    return (
+      <div className={styles.flowContainer}>
+        <div className={styles.botMessage}>
+          {currentMessage ? (
+            <div dangerouslySetInnerHTML={{ __html: currentMessage.replace(/\n/g, '<br/>') }} />
+          ) : (
+            <div>
+              <h3>🎯 Your Personalized Recommendations</h3>
+              <p><strong>Based on:</strong> {previewData.preferences.join(', ')}</p>
+              
+              <div className={styles.recommendationsList}>
+                {previewData.recommendations.map((rec, index) => {
+                  console.log(`🔍 Rendering recommendation ${index}:`, rec);
+                  const isSelected = selectedRecommendations.has(index);
+                  console.log(`🔍 Recommendation ${index} selected:`, isSelected);
+                  
+                  return (
+                    <div 
+                      key={index} 
+                      className={`${styles.recommendationItem} ${isSelected ? styles.selected : ''}`}
+                      onClick={() => {
+                        console.log(`🔍 Clicked on recommendation ${index}`);
+                        const newSelected = new Set(selectedRecommendations);
+                        if (newSelected.has(index)) {
+                          newSelected.delete(index);
+                          console.log(`🔍 Removed recommendation ${index} from selection`);
+                        } else {
+                          newSelected.add(index);
+                          console.log(`🔍 Added recommendation ${index} to selection`);
+                        }
+                        setSelectedRecommendations(newSelected);
+                        console.log('🔍 New selected recommendations:', Array.from(newSelected));
+                      }}
+                    >
+                      <div className={styles.recommendationCheckbox}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}} // Handled by onClick on parent div
+                          className={styles.checkboxInput}
+                        />
+                      </div>
+                      <div className={styles.recommendationContent}>
+                        <div className={styles.recommendationTitle}>
+                          {index + 1}. <strong>{rec.title}</strong>
+                        </div>
+                        <div className={styles.recommendationAction}>
+                          {rec.specificAction}
+                        </div>
+                        <div className={styles.recommendationPriority}>
+                          Priority: {rec.priority}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <div className={styles.selectionSummary}>
+                <p><strong>Selected:</strong> {selectedRecommendations.size} of {previewData.recommendations.length} recommendations</p>
+                <div className={styles.selectionActions}>
+                  <button 
+                    className={styles.selectAllButton}
+                    onClick={() => {
+                      const allIndices = new Set(Array.from({ length: previewData.recommendations.length }, (_, i) => i));
+                      setSelectedRecommendations(allIndices);
+                      console.log('🔍 All recommendations selected');
+                    }}
+                  >
+                    📋 Select All
+                  </button>
+                  <button 
+                    className={styles.clearAllButton}
+                    onClick={() => {
+                      setSelectedRecommendations(new Set());
+                      console.log('🔍 All selections cleared');
+                    }}
+                  >
+                    🗑️ Clear All
+                  </button>
+                </div>
+              </div>
+              
+              <div className={styles.nextSteps}>
+                <p>Select the recommendations you want, then choose an option below.</p>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <div className={styles.buttonGroup}>
+          <button 
+            className={styles.acceptButton}
+            onClick={() => {
+              console.log('✅ Accept button clicked!');
+              acceptRecommendationChanges();
+            }}
+            disabled={selectedRecommendations.size === 0}
+            style={{
+              opacity: selectedRecommendations.size === 0 ? 0.5 : 1,
+              cursor: selectedRecommendations.size === 0 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            ✅ Accept & Transfer Selected ({selectedRecommendations.size})
+          </button>
+          
+          <button 
+            className={styles.regenerateButton}
+            onClick={() => {
+              console.log('🔄 Regenerate button clicked!');
+              // Go back to personalization options to regenerate
+              dispatch({ type: 'SET_FLOW', flow: 'personalization-options' });
+            }}
+          >
+            🔄 Generate Different Options
+          </button>
+          
+          <button 
+            className={styles.rejectButton}
+            onClick={() => {
+              console.log('❌ Reject button clicked!');
+              // Go back to personalization options
+              dispatch({ type: 'SET_FLOW', flow: 'personalization-options' });
+            }}
+          >
+            ❌ Keep Current Ones
+          </button>
+        </div>
+      </div>
+    );
   };
 
   const renderPersonalizationOptionsFlow = () => {
@@ -1537,7 +1851,12 @@ const Chatbot: React.FC = () => {
                 type="text"
                 placeholder="Enter your city and state"
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(e) => {
+                  console.log('📍 Location changed to:', e.target.value);
+                  console.log('📍 Setting location state to:', e.target.value);
+                  setLocation(e.target.value);
+                  console.log('📍 Location state after set:', e.target.value);
+                }}
                 className={styles.textInput}
               />
               <div className={styles.locationOptions}>
@@ -1551,19 +1870,25 @@ const Chatbot: React.FC = () => {
                 >
                   📍 Use My Current Location
                 </button>
+                
+                {/* Add Find Stores button directly in Location section */}
                 <button 
                   type="button"
-                  className={styles.locationButton}
+                  className={styles.storeFinderButton}
                   onClick={() => {
-                    console.log('🔍 Find Shops button clicked!');
-                    findShopsForManualLocation();
+                    console.log('🏪 Find Stores button clicked from Location input');
+                    // Get the selected food item from the previous flow
+                    const selectedFoodItem = state.foodFeedback.selectedFoodItem || 'food items';
+                    dispatch({ type: 'TRIGGER_STORE_FINDER', foodItem: selectedFoodItem });
+                    dispatch({ type: 'SET_FLOW', flow: 'location-store-finder' });
                   }}
                   disabled={!location.trim()}
                 >
-                  🔍 Find Shops for My Location
+                  🏪 Find Stores Near Me
                 </button>
+                
                 <small className={styles.locationNote}>
-                  Enter your city/state above, then click &quot;Find Shops&quot;
+                  Enter your city/state above, then click "Find Stores" to locate nearby stores for your food items
                 </small>
               </div>
             </div>
@@ -1574,7 +1899,12 @@ const Chatbot: React.FC = () => {
               <label>🌤️ What&apos;s your typical weather?</label>
               <select
                 value={weather}
-                onChange={(e) => setWeather(e.target.value)}
+                onChange={(e) => {
+                  console.log('🌤️ Weather changed to:', e.target.value);
+                  console.log('🌤️ Setting weather state to:', e.target.value);
+                  setWeather(e.target.value);
+                  console.log('🌤️ Weather state after set:', e.target.value);
+                }}
                 className={styles.selectInput}
               >
                 <option value="">Select your typical weather</option>
@@ -1593,24 +1923,36 @@ const Chatbot: React.FC = () => {
             <div className={styles.inputGroup}>
               <label>🌍 What&apos;s your cultural background?</label>
               <select
-                value={culture}
-                onChange={(e) => setCulture(e.target.value)}
+                value={cultureEthnicity}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  console.log('🌍 Culture changed to:', value);
+                  console.log('🌍 Setting cultureEthnicity state to:', value);
+                  setCultureEthnicity(value);
+                  // Sync with culture state for consistency
+                  setCulture(value);
+                  console.log('🌍 Culture state after set:', value);
+                }}
                 className={styles.selectInput}
               >
-                <option value="">Select your culture/ethnicity</option>
-                <option value="South Asian">South Asian</option>
-                <option value="East Asian">East Asian</option>
-                <option value="Middle Eastern">Middle Eastern</option>
-                <option value="Mediterranean">Mediterranean (Italian, Greek, Turkish)</option>
-                <option value="Western/American/European">Western / American / European</option>
-                <option value="Other">Other (tell us)</option>
+                <option value="">Select your cultural background</option>
+                <option value="South Asian">🇮🇳 South Asian</option>
+                <option value="East Asian">🇨🇳 East Asian</option>
+                <option value="Middle Eastern">🇸🇦 Middle Eastern</option>
+                <option value="Mediterranean">🇮🇹 Mediterranean</option>
+                <option value="Western/American/European">🇺🇸 Western / American / European</option>
+                <option value="Other">🌍 Other</option>
               </select>
-              {culture === 'Other' && (
+              {cultureEthnicity === 'Other' && (
                 <input
-                  type="text"
                   placeholder="Please specify your culture/ethnicity"
                   value={other}
-                  onChange={(e) => setOther(e.target.value)}
+                  onChange={(e) => {
+                    console.log('📝 Other culture specified:', e.target.value);
+                    console.log('📝 Setting other state to:', e.target.value);
+                    setOther(e.target.value);
+                    console.log('📝 Other state after set:', e.target.value);
+                  }}
                   className={styles.textInput}
                 />
               )}
@@ -1620,10 +1962,25 @@ const Chatbot: React.FC = () => {
           <div className={styles.buttonGroup}>
             <button 
               className={styles.submitButton}
-              onClick={handleSubmit}
+              onClick={() => {
+                console.log('🔘 Submit button clicked!');
+                console.log('🔍 Current state when submit clicked:');
+                console.log('  - selectedOptions:', selectedOptions);
+                console.log('  - weather:', weather);
+                console.log('  - culture:', culture);
+                console.log('  - other:', other);
+                console.log('  - location:', location);
+                console.log('  - showInputs:', showInputs);
+                console.log('🔍 Button is responding!');
+                handleSubmit();
+              }}
               disabled={selectedOptions.length === 0}
+              style={{
+                opacity: selectedOptions.length === 0 ? 0.5 : 1,
+                cursor: selectedOptions.length === 0 ? 'not-allowed' : 'pointer'
+              }}
             >
-              ✅ Submit Preferences
+              ✅ Submit Preferences {selectedOptions.length > 0 ? `(${selectedOptions.length} selected)` : '(none selected)'}
             </button>
             <button 
               className={styles.backButton}
@@ -1663,10 +2020,15 @@ const Chatbot: React.FC = () => {
           <div 
             className={`${styles.optionCard} ${selectedOptions.includes('Weather') ? styles.selected : ''}`}
             onClick={() => {
+              console.log('🌤️ Weather option clicked, current selectedOptions:', selectedOptions);
               if (selectedOptions.includes('Weather')) {
-                setSelectedOptions(selectedOptions.filter(opt => opt !== 'Weather'));
+                const newOptions = selectedOptions.filter(opt => opt !== 'Weather');
+                console.log('🌤️ Removing Weather, new options:', newOptions);
+                setSelectedOptions(newOptions);
               } else {
-                setSelectedOptions([...selectedOptions, 'Weather']);
+                const newOptions = [...selectedOptions, 'Weather'];
+                console.log('🌤️ Adding Weather, new options:', newOptions);
+                setSelectedOptions(newOptions);
               }
             }}
           >
@@ -1678,10 +2040,15 @@ const Chatbot: React.FC = () => {
           <div 
             className={`${styles.optionCard} ${selectedOptions.includes('Culture/ethnicity') ? styles.selected : ''}`}
             onClick={() => {
+              console.log('🌍 Culture option clicked, current selectedOptions:', selectedOptions);
               if (selectedOptions.includes('Culture/ethnicity')) {
-                setSelectedOptions(selectedOptions.filter(opt => opt !== 'Culture/ethnicity'));
+                const newOptions = selectedOptions.filter(opt => opt !== 'Culture/ethnicity');
+                console.log('🌍 Removing Culture, new options:', newOptions);
+                setSelectedOptions(newOptions);
               } else {
-                setSelectedOptions([...selectedOptions, 'Culture/ethnicity']);
+                const newOptions = [...selectedOptions, 'Culture/ethnicity'];
+                console.log('🌍 Adding Culture, new options:', newOptions);
+                setSelectedOptions(newOptions);
               }
             }}
           >
@@ -1693,10 +2060,15 @@ const Chatbot: React.FC = () => {
           <div 
             className={`${styles.optionCard} ${selectedOptions.includes('Other') ? styles.selected : ''}`}
             onClick={() => {
+              console.log('📝 Other option clicked, current selectedOptions:', selectedOptions);
               if (selectedOptions.includes('Other')) {
-                setSelectedOptions(selectedOptions.filter(opt => opt !== 'Other'));
+                const newOptions = selectedOptions.filter(opt => opt !== 'Other');
+                console.log('📝 Removing Other, new options:', newOptions);
+                setSelectedOptions(newOptions);
               } else {
-                setSelectedOptions([...selectedOptions, 'Other']);
+                const newOptions = [...selectedOptions, 'Other'];
+                console.log('📝 Adding Other, new options:', newOptions);
+                setSelectedOptions(newOptions);
               }
             }}
           >
@@ -1709,10 +2081,16 @@ const Chatbot: React.FC = () => {
         <div className={styles.nextStepButton}>
           <button 
             className={styles.nextButton}
-            onClick={() => setShowInputs(true)}
+            onClick={() => {
+              console.log('🚀 Next Step button clicked!');
+              console.log('🔍 Current selectedOptions:', selectedOptions);
+              console.log('🔍 Current showInputs:', showInputs);
+              setShowInputs(true);
+              console.log('🔍 After setting showInputs to true');
+            }}
             disabled={selectedOptions.length === 0}
           >
-            🚀 Next Step: Provide Details
+            🚀 Next Step: Provide Details {selectedOptions.length > 0 ? `(${selectedOptions.length} selected)` : '(none selected)'}
           </button>
         </div>
       </div>
@@ -2065,7 +2443,13 @@ const Chatbot: React.FC = () => {
     );
   };
 
-  const handleTasteSubmit = () => {
+  const handleTasteSubmit = async () => {
+    // Prevent multiple clicks while processing
+    if (isGeneratingRecommendations) {
+      console.log('🚫 Already generating recommendations, ignoring click');
+      return;
+    }
+    
     console.log('🚀 Taste submit button clicked!');
     console.log('📊 Current taste state:', {
       selectedFoodItem: state.tasteFeedback.selectedFoodItem,
@@ -2105,18 +2489,299 @@ const Chatbot: React.FC = () => {
     // Store preferences in chatbot state
     dispatch({ type: 'SET_PERSONALIZATION_PREFERENCES', preferences });
     
+    // Set loading state
+    setIsGeneratingRecommendations(true);
+    setRetryAttempt(0); // Reset retry attempt
     setCurrentMessage("🎯 Personalizing according to your taste preferences... Generating delicious alternatives for you! ✨");
     
-    // Show the message for 2 seconds, then hide chatbot
-    setTimeout(() => {
-      hideChatbot();
-      // Clear the message after hiding
-      setTimeout(() => setCurrentMessage(''), 100);
-    }, 2000);
+    try {
+      // Generate personalized recommendations
+      console.log('🔄 Calling generatePersonalizedRecommendations...');
+      const personalizedRecommendations = await generatePersonalizedRecommendations(preferences);
+      console.log('✅ Generated recommendations:', personalizedRecommendations);
+      
+      // Store the recommendations and preferences for display
+      const previewData = {
+        preferences,
+        recommendations: personalizedRecommendations,
+        isMainPageUpdated: false
+      };
+      
+      setPreviewData(previewData);
+      setSelectedRecommendations(new Set()); // Reset selection
+      
+      // Show the personalized recommendations
+      setCurrentMessage(
+        `🎉 **Successfully Generated Personalized Recommendations!**\n\n` +
+        `**Your Preferences:** ${preferences.join(', ')}\n\n` +
+        `**Generated Recommendations:**\n${personalizedRecommendations.map((rec, index) => 
+          `${index + 1}. **${rec.title}**\n   ${rec.specificAction}\n   Priority: ${rec.priority}\n`
+        ).join('\n')}\n\n` +
+        `💡 These recommendations are tailored to your taste preferences and health profile!\n\n` +
+        `🎯 You can now select which recommendations to transfer to your main page.`
+      );
+      
+      // Change flow to show personalized recommendations
+      dispatch({ type: 'SET_FLOW', flow: 'personalized-recommendations' });
+      
+    } catch (error) {
+      console.error('❌ Failed to generate recommendations:', error);
+      setCurrentMessage("⚠️ Sorry, I couldn't generate personalized recommendations. Please try again.");
+    } finally {
+      // Clear loading state
+      setIsGeneratingRecommendations(false);
+    }
+  };
+
+  const handleTooHardSubmit = async () => {
+    // Prevent multiple clicks while processing
+    if (isGeneratingRecommendations) {
+      console.log('🚫 Already generating recommendations, ignoring click');
+      return;
+    }
+    
+    console.log('🚀 Too-hard submit button clicked!');
+    console.log('📊 Current too-hard state:', {
+      selectedItem: state.tooHardFeedback.selectedItem,
+      timePerDay: state.tooHardFeedback.timePerDay,
+      dailyActions: state.tooHardFeedback.dailyActions,
+      easiestToStart: state.tooHardFeedback.easiestToStart
+    });
+    
+    const preferences = [];
+    
+    if (state.tooHardFeedback.timePerDay) {
+      preferences.push(`Time per day: ${state.tooHardFeedback.timePerDay}`);
+    }
+    if (state.tooHardFeedback.dailyActions) {
+      preferences.push(`Daily actions: ${state.tooHardFeedback.dailyActions}`);
+    }
+    if (state.tooHardFeedback.easiestToStart) {
+      preferences.push(`Easiest to start: ${state.tooHardFeedback.easiestToStart}`);
+    }
+    
+    console.log('🎯 Too-hard preferences to submit:', preferences);
+    
+    if (preferences.length === 0) {
+      console.log('❌ No too-hard preferences to submit, showing error');
+      setCurrentMessage("⚠️ Please fill in all fields before submitting.");
+      return;
+    }
+    
+    // Store preferences in chatbot state
+    dispatch({ type: 'SET_PERSONALIZATION_PREFERENCES', preferences });
+    
+    // Set loading state
+    setIsGeneratingRecommendations(true);
+    setRetryAttempt(0); // Reset retry attempt
+    setCurrentMessage("🎯 Personalizing according to your difficulty level... Generating easier alternatives for you! ✨");
+    
+    try {
+      // Generate personalized recommendations
+      console.log('🔄 Calling generatePersonalizedRecommendations...');
+      const personalizedRecommendations = await generatePersonalizedRecommendations(preferences);
+      console.log('✅ Generated recommendations:', personalizedRecommendations);
+      
+      // Store the recommendations and preferences for display
+      const previewData = {
+        preferences,
+        recommendations: personalizedRecommendations,
+        isMainPageUpdated: false
+      };
+      
+      setPreviewData(previewData);
+      setSelectedRecommendations(new Set()); // Reset selection
+      
+      // Show the personalized recommendations
+      setCurrentMessage(
+        `🎉 **Successfully Generated Personalized Recommendations!**\n\n` +
+        `**Your Preferences:** ${preferences.join(', ')}\n\n` +
+        `**Generated Recommendations:**\n${personalizedRecommendations.map((rec, index) => 
+          `${index + 1}. **${rec.title}**\n   ${rec.specificAction}\n   Priority: ${rec.priority}\n`
+        ).join('\n')}\n\n` +
+        `💡 These recommendations are tailored to be easier to implement based on your feedback!\n\n` +
+        `🎯 You can now select which recommendations to transfer to your main page.`
+      );
+      
+      // Change flow to show personalized recommendations
+      dispatch({ type: 'SET_FLOW', flow: 'personalized-recommendations' });
+      
+    } catch (error) {
+      console.error('❌ Failed to generate recommendations:', error);
+      setCurrentMessage("⚠️ Sorry, I couldn't generate personalized recommendations. Please try again.");
+    } finally {
+      // Clear loading state
+      setIsGeneratingRecommendations(false);
+    }
+  };
+
+  const findStoresForLocation = async () => {
+    console.log('🔍 Find stores for location:', state.storeFinder.location);
+    
+    if (!state.storeFinder.location.trim()) {
+      setCurrentMessage("⚠️ Please enter your location first.");
+      return;
+    }
+
+    try {
+      // Set searching state
+      dispatch({ type: 'SET_STORE_FINDER_RESULTS', results: [] });
+      
+      // Simulate store search for the selected food item
+      const foodItem = state.storeFinder.selectedFoodItem || 'food item';
+      const location = state.storeFinder.location;
+      
+      console.log('🔍 Searching for stores for:', foodItem, 'in:', location);
+      
+      // Use the existing findShopsAndOnlineOptions function
+      const shopResults = await findShopsAndOnlineOptions([{ title: foodItem }], location, 0, 0);
+      
+      if (shopResults.length > 0) {
+        // Convert shop results to store finder format
+        const storeResults = shopResults.map((result: string, index: number) => {
+          // Parse the shop result to extract store information
+          const lines = result.split('\n');
+          const itemTitle = lines[0]?.replace('📍 **', '').replace('**', '') || `Item ${index + 1}`;
+          
+          // Extract store suggestions from the new format
+          const storeSuggestions = lines.filter(line => line.includes('🏪 **Local Store Suggestions'));
+          const onlineOptions = lines.filter(line => line.includes('🛒 **Online Options'));
+          
+          return {
+            name: itemTitle,
+            distance: '2-10 miles',
+            priceRange: '$$',
+            hours: 'Varies',
+            specialties: ['health food', 'supplements', 'organic'],
+            storeSuggestions: storeSuggestions.join('\n'),
+            onlineOptions: onlineOptions.join('\n')
+          };
+        });
+        
+        dispatch({ type: 'SET_STORE_FINDER_RESULTS', results: storeResults });
+        setCurrentMessage(`🏪 Found shopping options for ${storeResults.length} items in ${location}! Check the results below for both local stores and online options.`);
+      } else {
+        setCurrentMessage(`🏪 No stores found for ${foodItem} in ${location}. Try expanding your search area or check online retailers.`);
+      }
+    } catch (error) {
+      console.error('❌ Store search failed:', error);
+      setCurrentMessage("⚠️ Sorry, I couldn't search for stores right now. Please try again later.");
+    }
+  };
+
+  const renderLocationStoreFinderFlow = () => {
+    const selectedFoodItem = state.storeFinder.selectedFoodItem;
+    
+    return (
+      <div className={styles.flowContainer}>
+        <div className={styles.botMessage}>
+          <strong>🏪 Let's find stores near you for: <em>{selectedFoodItem}</em></strong>
+          <br />
+          <small>I'll help you locate nearby stores where you can find this item.</small>
+        </div>
+        
+        <div className={styles.inputGroup}>
+          <label>📍 Enter your location:</label>
+          <input
+            type="text"
+            placeholder="City, State (e.g., Fremont, CA)"
+            value={state.storeFinder.location}
+            onChange={(e) => dispatch({ type: 'SET_STORE_FINDER_LOCATION', location: e.target.value })}
+            className={styles.textInput}
+          />
+          <div className={styles.locationOptions}>
+            <button 
+              type="button"
+              className={styles.locationButton}
+              onClick={() => {
+                console.log('📍 Use Current Location button clicked!');
+                requestLocationAccess();
+              }}
+            >
+              📍 Use My Current Location
+            </button>
+            <button 
+              type="button"
+              className={styles.storeFinderButton}
+              onClick={() => {
+                console.log('🔍 Find Stores button clicked!');
+                findStoresForLocation();
+              }}
+              disabled={!state.storeFinder.location.trim()}
+            >
+              🔍 Find Stores Near Me
+            </button>
+            <small className={styles.locationNote}>
+              Enter your city/state above, then click "Find Stores"
+            </small>
+          </div>
+        </div>
+        
+        {state.storeFinder.isSearching && (
+          <div className={styles.searchingMessage}>
+            🔍 Searching for stores near you...
+          </div>
+        )}
+        
+        {state.storeFinder.searchResults.length > 0 && (
+          <div className={styles.searchResults}>
+            <h4>🏪 Stores Found Near You:</h4>
+            {state.storeFinder.searchResults.map((result, index) => (
+              <div key={index} className={styles.storeResult}>
+                <div className={styles.storeName}>{result.name}</div>
+                {result.onlineOptions && (
+                  <div className={styles.onlineOptions}>
+                    {result.onlineOptions}
+                  </div>
+                )}
+                {result.storeSuggestions && (
+                  <div className={styles.storeSuggestions}>
+                    {result.storeSuggestions}
+                  </div>
+                )}
+                <div className={styles.storeDetails}>
+                  <span>📍 {result.distance} away</span>
+                  <span>💰 {result.priceRange}</span>
+                  <span>🕒 {result.hours}</span>
+                </div>
+                <div className={styles.storeSpecialties}>
+                  ✨ Specialties: {result.specialties.join(', ')}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div className={styles.buttonGroup}>
+          <button 
+            className={styles.backButton}
+            onClick={() => dispatch({ type: 'SET_FLOW', flow: 'personalization-options' })}
+          >
+            🔙 Back to Options
+          </button>
+        </div>
+      </div>
+    );
   };
 
   const renderCurrentFlow = () => {
     console.log('🎭 Rendering flow:', state.currentFlow);
+    console.log('🔍 Current flow state:', state.currentFlow);
+    console.log('🔍 previewData exists:', !!previewData);
+    console.log('🔍 currentMessage:', currentMessage);
+    console.log('🔍 selectedRecommendations size:', selectedRecommendations.size);
+    console.log('🔍 isGeneratingRecommendations:', isGeneratingRecommendations);
+    console.log('🔍 isGeneratingRecommendations type:', typeof isGeneratingRecommendations);
+    console.log('🔍 isGeneratingRecommendations value:', isGeneratingRecommendations);
+    
+    // Show loading message if generating recommendations
+    if (isGeneratingRecommendations === true) {
+      console.log('🔄 Loading state is TRUE - showing loading message');
+      return renderLoadingMessage();
+    } else {
+      console.log('❌ Loading state is FALSE - not showing loading message');
+    }
+    
     switch (state.currentFlow) {
       case 'feedback':
         return renderFeedbackFlow();
@@ -2126,6 +2791,10 @@ const Chatbot: React.FC = () => {
         return renderFoodItemSelectionFlow();
       case 'personalization-options':
         return renderPersonalizationOptionsFlow();
+      case 'personalized-recommendations':
+        return renderPersonalizedRecommendationsFlow();
+      case 'recommendations-accepted':
+        return renderRecommendationsAcceptedFlow();
       case 'select-restriction-food-item':
         return renderRestrictionFoodItemSelectionFlow();
       case 'restriction-personalization-options':
@@ -2138,6 +2807,8 @@ const Chatbot: React.FC = () => {
         return renderTooHardItemSelectionFlow();
       case 'too-hard-personalization-options':
         return renderTooHardPersonalizationOptionsFlow();
+      case 'location-store-finder':
+        return renderLocationStoreFinderFlow();
       default:
         console.log('❌ No flow set, returning null');
         return null;
@@ -2320,67 +2991,213 @@ const Chatbot: React.FC = () => {
     );
   };
 
-  const handleTooHardSubmit = () => {
-    console.log('🚀 Too-hard submit button clicked!');
-    console.log('📊 Current too-hard state:', {
-      selectedItem: state.tooHardFeedback.selectedItem,
-      timePerDay: state.tooHardFeedback.timePerDay,
-      dailyActions: state.tooHardFeedback.dailyActions,
-      easiestToStart: state.tooHardFeedback.easiestToStart
+  const handlePersonalizedRecommendationAction = async (action: 'accept' | 'reject' | 'suggest') => {
+    if (action === 'accept') {
+      try {
+        setCurrentMessage("🎯 Transferring your personalized recommendations to the main page...");
+        
+        // Convert personalized recommendations to the format expected by the main page
+        const formattedRecommendations = previewData?.recommendations.map(rec => ({
+          title: rec.title,
+          specificAction: rec.specificAction,
+          category: 'food', // Since these are mostly food recommendations
+          priority: rec.priority
+        })) || [];
+        
+        // Update the current recommendations context with new recommendations
+        if (formattedRecommendations.length > 0) {
+          currentRecs.updateRecommendations(formattedRecommendations);
+          
+          setCurrentMessage(
+            `✅ **Successfully Transferred!**\n\n` +
+            `**Your personalized recommendations are now active on the main page:**\n\n` +
+            `${formattedRecommendations.map((rec, index) => 
+              `${index + 1}. **${rec.title}**\n   ${rec.specificAction}\n   Priority: ${rec.priority}\n`
+            ).join('\n')}\n\n` +
+            `💡 **These weather and culture-optimized recommendations are now your main recommendations!**\n\n` +
+            `**You can now close this chatbot and see them on your main page.**`
+          );
+          
+          // Mark as updated
+          setPreviewData({ 
+            ...previewData!, 
+            isMainPageUpdated: true 
+          });
+          
+          // Hide chatbot after 8 seconds to give user time to read
+          setTimeout(() => {
+            hideChatbot();
+            setTimeout(() => setCurrentMessage(''), 100);
+          }, 8000);
+          
+        } else {
+          setCurrentMessage("⚠️ No recommendations to transfer. Please try again.");
+        }
+        
+      } catch (error) {
+        console.error('❌ Failed to transfer recommendations:', error);
+        setCurrentMessage("⚠️ Sorry, I couldn't transfer the recommendations. Please try again.");
+      }
+      
+    } else if (action === 'reject') {
+      setCurrentMessage("❌ Got it! Your current recommendations stay the same. No changes were made to the main page.");
+      
+      // Clear preview data and hide after 3 seconds
+      setTimeout(() => {
+        setPreviewData(null);
+        hideChatbot();
+        setTimeout(() => setCurrentMessage(''), 100);
+      }, 3000);
+      
+    } else if (action === 'suggest') {
+      // Generate new alternatives
+      if (previewData) {
+        try {
+          setCurrentMessage("🔄 Generating alternative recommendations...");
+          
+          // Generate different alternatives based on the same preferences
+          const alternativeRecommendations = await generateAlternativeRecommendations(previewData.preferences);
+          
+          // Update preview data with alternatives
+          setPreviewData({ 
+            preferences: previewData.preferences, 
+            recommendations: alternativeRecommendations,
+            isMainPageUpdated: false
+          });
+          
+          // Show the new alternatives
+          const alternativesMessage = createPersonalizedRecommendationsDisplay(
+            alternativeRecommendations, 
+            previewData.preferences
+          );
+          
+          setCurrentMessage(alternativesMessage);
+          
+        } catch (error) {
+          console.error('❌ Failed to generate alternatives:', error);
+          setCurrentMessage("⚠️ Sorry, I couldn't generate alternatives. Please try again.");
+        }
+      }
+    }
+  };
+
+  const generateAlternativeRecommendations = async (preferences: string[]): Promise<Array<{title: string, specificAction: string, priority: string}>> => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Generate alternative recommendations based on preferences
+    const recommendations = [];
+    
+    // Weather-based alternative recommendations
+    if (preferences.some(p => p.startsWith('Weather:'))) {
+      const weather = preferences.find(p => p.startsWith('Weather:'))?.split(': ')[1];
+      
+      if (weather?.toLowerCase().includes('hot') || weather?.toLowerCase().includes('summer')) {
+        // Alternative hot weather recommendations
+        recommendations.push({
+          title: "Alternative Cooling Herbs for Hormones",
+          specificAction: "Try basil, cilantro, and parsley in cooling drinks and salads for hormone balance",
+          priority: "High"
+        });
+        
+        recommendations.push({
+          title: "Alternative Hydrating Foods",
+          specificAction: "Include celery, lettuce, and radishes for cooling hydration and hormone support",
+          priority: "Medium"
+        });
+        
+        recommendations.push({
+          title: "Alternative Cooling Proteins",
+          specificAction: "Try white fish, shrimp, or tempeh with cooling herbs for hormone balance",
+          priority: "Medium"
+        });
+        
+      } else if (weather?.toLowerCase().includes('cold') || weather?.toLowerCase().includes('winter')) {
+        // Alternative cold weather recommendations
+        recommendations.push({
+          title: "Alternative Warming Herbs",
+          specificAction: "Try cloves, allspice, and star anise for warming hormone support",
+          priority: "High"
+        });
+        
+        recommendations.push({
+          title: "Alternative Winter Vegetables",
+          specificAction: "Include turnips, parsnips, and rutabagas for warming energy and hormone support",
+          priority: "Medium"
+        });
+        
+        recommendations.push({
+          title: "Alternative Warming Drinks",
+          specificAction: "Try chai tea, hot chocolate with cinnamon, or warm apple cider for hormone balance",
+          priority: "Medium"
+        });
+      }
+    }
+    
+    // Culture-based alternative recommendations
+    if (preferences.some(p => p.startsWith('Culture:'))) {
+      const culture = preferences.find(p => p.startsWith('Culture:'))?.split(': ')[1];
+      
+      if (culture?.toLowerCase().includes('indian') || culture?.toLowerCase().includes('south asian')) {
+        recommendations.push({
+          title: "Alternative Ayurvedic Herbs",
+          specificAction: "Try brahmi, guduchi, and yashtimadhu for alternative hormone support",
+          priority: "High"
+        });
+        
+        recommendations.push({
+          title: "Alternative Indian Cooling Foods",
+          specificAction: "Include kokum, tamarind, and raw mango for cooling hormone balance",
+          priority: "Medium"
+        });
+        
+      } else if (culture?.toLowerCase().includes('mediterranean')) {
+        recommendations.push({
+          title: "Alternative Mediterranean Foods",
+          specificAction: "Try artichokes, capers, and anchovies for hormone balance and gut health",
+          priority: "High"
+        });
+        
+        recommendations.push({
+          title: "Alternative Mediterranean Herbs",
+          specificAction: "Use sage, marjoram, and bay leaves for their hormone-balancing properties",
+          priority: "Medium"
+        });
+      }
+    }
+    
+    // Core alternative hormone-balancing recommendations
+    recommendations.push({
+      title: "Alternative Omega-3 Sources",
+      specificAction: "Try chia seeds, hemp seeds, and algae supplements for hormone balance",
+      priority: "High"
     });
     
-    const preferences = [];
+    recommendations.push({
+      title: "Alternative Probiotic Foods",
+      specificAction: "Include tempeh, natto, and kefir for gut health and hormone regulation",
+      priority: "High"
+    });
     
-    if (state.tooHardFeedback.timePerDay) {
-      preferences.push(`Time per day: ${state.tooHardFeedback.timePerDay}`);
-    }
-    if (state.tooHardFeedback.dailyActions) {
-      preferences.push(`Daily actions: ${state.tooHardFeedback.dailyActions}`);
-    }
-    if (state.tooHardFeedback.easiestToStart) {
-      preferences.push(`Easiest to start: ${state.tooHardFeedback.easiestToStart}`);
-    }
+    recommendations.push({
+      title: "Alternative Fiber Sources",
+      specificAction: "Include psyllium husk, chia seeds, and flaxseeds for hormone metabolism",
+      priority: "Medium"
+    });
     
-    console.log('🎯 Too-hard preferences to submit:', preferences);
-    
-    if (preferences.length === 0) {
-      console.log('❌ No too-hard preferences to submit, showing error');
-      setCurrentMessage("⚠️ Please fill in all fields before submitting.");
-      return;
-    }
-    
-    // Store preferences in chatbot state
-    dispatch({ type: 'SET_PERSONALIZATION_PREFERENCES', preferences });
-    
-    // Trigger recommendation refresh with the selected category
-    if (state.tooHardFeedback.easiestToStart) {
-      const category = state.tooHardFeedback.easiestToStart;
-      console.log('🎯 Triggering recommendation refresh for category:', category);
-      
-      // Map the category to a more descriptive reason
-      let reason = '';
-      if (category === 'food') reason = 'User prefers food-based recommendations';
-      else if (category === 'move') reason = 'User prefers movement-based recommendations';
-      else if (category === 'emotions') reason = 'User prefers mindfulness/emotion-based recommendations';
-      
-      dispatch({ 
-        type: 'TRIGGER_RECOMMENDATION_REFRESH', 
-        reason: reason,
-        preferences: preferences
+    // Ensure we have at least 6 recommendations
+    while (recommendations.length < 6) {
+      recommendations.push({
+        title: "Alternative Balanced Meal Options",
+        specificAction: "Try different protein sources, grain alternatives, and vegetable combinations for hormone balance",
+        priority: "Medium"
       });
-      
-      setCurrentMessage(`🎯 Perfect! I'll show you only ${category === 'food' ? '🍽️ food' : category === 'move' ? '🏃‍♀️ movement' : '🧘‍♀️ mindfulness'} recommendations that fit your ${state.tooHardFeedback.timePerDay} daily time and ${state.tooHardFeedback.dailyActions} daily actions. Refreshing your recommendations now... ✨`);
-    } else {
-      setCurrentMessage("🎯 Personalizing according to your time and energy levels... Generating easier alternatives that fit your schedule! ✨");
     }
     
-    // Show the message for 3 seconds, then hide chatbot
-    setTimeout(() => {
-      hideChatbot();
-      // Clear the message after hiding
-      setTimeout(() => setCurrentMessage(''), 100);
-    }, 3000);
+    return recommendations.slice(0, 8); // Return max 8 recommendations
   };
+
+
 
   return (
     <div className={styles.chatbotOverlay}>
@@ -2399,6 +3216,43 @@ const Chatbot: React.FC = () => {
         </div>
         
         <div className={styles.chatbotBody}>
+          {/* Debug loading state display */}
+          <div style={{ 
+            position: 'absolute', 
+            top: '10px', 
+            right: '10px', 
+            background: '#333', 
+            color: 'white', 
+            padding: '5px 10px', 
+            borderRadius: '5px', 
+            fontSize: '12px',
+            zIndex: 1000
+          }}>
+            🔄 Loading: {isGeneratingRecommendations ? 'TRUE' : 'FALSE'}
+          </div>
+          
+          {/* Debug user profile display */}
+          <div style={{ 
+            position: 'absolute', 
+            top: '50px', 
+            right: '10px', 
+            background: '#333', 
+            color: 'white', 
+            padding: '5px 10px', 
+            borderRadius: '5px', 
+            fontSize: '10px',
+            zIndex: 1000,
+            maxWidth: '200px'
+          }}>
+            👤 Profile: {state.userProfile.primaryImbalance || 'None'}
+            <br />
+            🏥 Conditions: {state.userProfile.conditions.length || 0}
+            <br />
+            😷 Symptoms: {state.userProfile.symptoms.length || 0}
+            <br />
+            🧪 Hormones: {Object.values(state.userProfile.hormoneScores).filter(score => score > 0).length || 0}
+          </div>
+          
           {renderCurrentFlow()}
         </div>
       </div>

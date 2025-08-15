@@ -59,6 +59,31 @@
 .personalizationNotice {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  padding: 15px 20px;
+  border-radius: 10px;
+  margin: 20px 0;
+  text-align: center;
+  font-weight: 500;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  animation: slideIn 0.5s ease-out;
+}
+
+.updateNotification {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  padding: 15px 20px;
+  border-radius: 10px;
+  margin: 20px 0;
+  text-align: center;
+  font-weight: 500;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+  animation: slideIn 0.5s ease-out;
+}
+
+/* Context Update Notice */
+.contextUpdateNotice {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
   border-radius: 15px;
   padding: 20px;
   margin: 0 auto 30px auto;
@@ -66,7 +91,7 @@
   display: flex;
   align-items: center;
   gap: 15px;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 25px rgba(72, 187, 120, 0.3);
   animation: slideDown 0.5s ease-out;
 }
 
@@ -148,6 +173,35 @@
   font-size: 1.3rem;
   font-weight: 600;
   color: #2d3748;
+}
+
+.personalizationBadge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-left: 8px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  }
 }
 
 .priorityBadge {

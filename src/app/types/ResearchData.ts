@@ -98,6 +98,11 @@ export interface Recommendation {
   contraindications?: string[];
   frequency: string; // e.g., "daily", "3x per week"
   duration?: string; // e.g., "10 minutes", "30 minutes"
+  // Personalization fields
+  isPersonalized?: boolean;
+  personalizationDate?: string;
+  originalTitle?: string;
+  originalAction?: string;
   intensity?: 'low' | 'moderate' | 'high';
   priority: 'high' | 'medium' | 'low';
   

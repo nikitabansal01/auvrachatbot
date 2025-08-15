@@ -13,12 +13,19 @@ interface Recommendation {
   frequency?: string;
   expectedTimeline?: string;
   priority?: string;
+  // Personalization fields
+  isPersonalized?: boolean;
+  personalizationDate?: string;
+  originalTitle?: string;
+  originalAction?: string;
 }
 
 interface CurrentRecommendationsContextType {
   currentRecommendations: Recommendation[];
   setCurrentRecommendations: (recommendations: Recommendation[]) => void;
   updateRecommendations: (newRecommendations: Recommendation[]) => void;
+  refreshMainPage: () => void;
+  shouldRefresh: boolean;
 }
 
 const CurrentRecommendationsContext = createContext<CurrentRecommendationsContextType | null>(null);
@@ -28,17 +35,27 @@ export function CurrentRecommendationsProvider({ children, initialRecommendation
   initialRecommendations: Recommendation[] 
 }) {
   const [currentRecommendations, setCurrentRecommendations] = useState<Recommendation[]>(initialRecommendations);
+  const [shouldRefresh, setShouldRefresh] = useState(false);
 
   const updateRecommendations = (newRecommendations: Recommendation[]) => {
     console.log('🔄 Updating current recommendations:', newRecommendations);
     setCurrentRecommendations(newRecommendations);
   };
 
+  const refreshMainPage = () => {
+    console.log('🔄 Triggering main page refresh');
+    setShouldRefresh(true);
+    // Reset the flag after a short delay
+    setTimeout(() => setShouldRefresh(false), 100);
+  };
+
   return (
     <CurrentRecommendationsContext.Provider value={{
       currentRecommendations,
       setCurrentRecommendations,
-      updateRecommendations
+      updateRecommendations,
+      refreshMainPage,
+      shouldRefresh
     }}>
       {children}
     </CurrentRecommendationsContext.Provider>

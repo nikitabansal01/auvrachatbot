@@ -10,6 +10,7 @@ async function callOpenAI(prompt: string): Promise<string> {
     return '';
   }
   try {
+    console.log('🤖 Calling OpenAI API with prompt length:', prompt.length);
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -20,7 +21,7 @@ async function callOpenAI(prompt: string): Promise<string> {
         model: 'gpt-3.5-turbo',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: 1800
+        max_tokens: 3000 // Increased from 1800 to get more comprehensive responses
       })
     });
     if (!response.ok) {
@@ -28,7 +29,10 @@ async function callOpenAI(prompt: string): Promise<string> {
       return '';
     }
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
+    const responseText = data.choices?.[0]?.message?.content || '';
+    console.log('🤖 OpenAI API response length:', responseText.length);
+    console.log('🤖 OpenAI API response preview:', responseText.substring(0, 200) + '...');
+    return responseText;
   } catch (e) {
     console.error('OpenAI fetch 에러:', e);
     return '';
@@ -41,6 +45,7 @@ async function callGroq(prompt: string): Promise<string> {
     return '';
   }
   try {
+    console.log('🤖 Calling Groq API with prompt length:', prompt.length);
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -56,7 +61,7 @@ async function callGroq(prompt: string): Promise<string> {
         model: 'llama-3.3-70b-versatile', // 최신 지원 모델, 의료 추천 시스템에 적합
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
-        max_tokens: 1800
+        max_tokens: 3000 // Increased from 1800 to get more comprehensive responses
       })
     });
     if (!response.ok) {
@@ -64,7 +69,10 @@ async function callGroq(prompt: string): Promise<string> {
       return '';
     }
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
+    const responseText = data.choices?.[0]?.message?.content || '';
+    console.log('🤖 Groq API response length:', responseText.length);
+    console.log('🤖 Groq API response preview:', responseText.substring(0, 200) + '...');
+    return responseText;
   } catch (e) {
     console.error('Groq fetch 에러:', e);
     return '';
@@ -232,68 +240,11 @@ function filterRecommendationsByCategory(recommendations: Recommendation[], cate
 function postProcessRecommendations(recommendations: Recommendation[], category: string): Recommendation[] {
   console.log(`🔧 Post-processing ${recommendations.length} recommendations for category: ${category}`);
   
-  // Food-related keywords that should always be in the food category
-  const foodKeywords = ['tea', 'herb', 'spice', 'drink', 'beverage', 'infusion', 'extract', 'powder', 'capsule', 'tablet', 'oil', 'seed', 'nut', 'fruit', 'vegetable', 'grain', 'legume', 'supplement', 'vitamin', 'mineral', 'spearmint', 'chamomile', 'ginger', 'turmeric', 'cinnamon', 'honey', 'lemon', 'mint', 'lavender', 'rose', 'hibiscus', 'green tea', 'black tea', 'white tea', 'oolong tea', 'herbal tea'];
+  // Remove hardcoded keyword filtering - let the LLM handle proper categorization
+  // This allows for more dynamic and context-aware recommendations
   
-  // Movement-related keywords that should always be in the movement category
-  const movementKeywords = ['yoga', 'exercise', 'workout', 'walk', 'run', 'strength', 'training', 'dance', 'sport', 'physical', 'movement', 'activity', 'session', 'minute', 'intensity', 'cardio', 'stretching', 'perform', 'practice', 'pilates', 'zumba', 'swimming', 'cycling', 'jogging', 'hiking', 'weightlifting', 'aerobics'];
-  
-  // Mindfulness-related keywords that should always be in the mindfulness category
-  const mindfulnessKeywords = ['meditation', 'breathing', 'relaxation', 'stress', 'mental', 'mindfulness', 'emotional', 'progressive', 'muscle', 'technique', 'practice', 'wellness', 'calm', 'focus', 'awareness', 'mindful', 'visualization', 'guided', 'mantra', 'zen', 'vipassana', 'transcendental'];
-  
-  let removedCount = 0;
-  let filtered = recommendations;
-  
-  // Remove food items from non-food categories
-  if (category !== 'food') {
-    filtered = filtered.filter(rec => {
-      const title = (rec.title || '').toLowerCase();
-      const action = (rec.specificAction || '').toLowerCase();
-      const text = `${title} ${action}`;
-      
-      const hasFoodKeywords = foodKeywords.some(keyword => text.includes(keyword));
-      if (hasFoodKeywords) {
-        console.log(`🚫 Removed food item from ${category} category: "${title}"`);
-        removedCount++;
-      }
-      return !hasFoodKeywords;
-    });
-  }
-  
-  // Remove movement items from non-movement categories
-  if (category !== 'movement') {
-    filtered = filtered.filter(rec => {
-      const title = (rec.title || '').toLowerCase();
-      const action = (rec.specificAction || '').toLowerCase();
-      const text = `${title} ${action}`;
-      
-      const hasMovementKeywords = movementKeywords.some(keyword => text.includes(keyword));
-      if (hasMovementKeywords) {
-        console.log(`🚫 Removed movement item from ${category} category: "${title}"`);
-        removedCount++;
-      }
-      return !hasMovementKeywords;
-    });
-  }
-  
-  // Remove mindfulness items from non-mindfulness categories
-  if (category !== 'mindfulness') {
-    filtered = filtered.filter(rec => {
-      const title = (rec.title || '').toLowerCase();
-      const action = (rec.specificAction || '').toLowerCase();
-      const text = `${title} ${action}`;
-      
-      const hasMindfulnessKeywords = mindfulnessKeywords.some(keyword => text.includes(keyword));
-      if (hasMindfulnessKeywords) {
-        console.log(`🚫 Removed mindfulness item from ${category} category: "${title}"`);
-        removedCount++;
-      }
-      return !hasMindfulnessKeywords;
-    });
-  }
-  
-  console.log(`🔧 Post-processing complete: ${recommendations.length} → ${filtered.length} recommendations (removed ${removedCount} misclassified items)`);
-  return filtered;
+  console.log(`🔧 Post-processing complete: ${recommendations.length} recommendations (no hardcoded filtering applied)`);
+  return recommendations;
 }
 
 function evaluateLLMConfidence(llmResponse: string): number {
@@ -464,7 +415,7 @@ function suggestLLMPromptForRecommendations({ userProfile, category, alternative
   - Cooking methods, meal timing, portion sizes, food combinations
   - NO exercise, movement, yoga, meditation, breathing exercises
   - REQUIRE specific amounts, timing, and preparation methods
-  - Examples: "Consume 2 tablespoons of ground flaxseed daily with breakfast", "Eat 100g of wild-caught salmon 3 times per week for dinner", "Take 400mg magnesium glycinate supplement 30 minutes before bed", "Drink 2 cups of spearmint tea daily (morning and evening)", "Add 1 teaspoon of Ceylon cinnamon to oatmeal or smoothies daily"
+  - Examples: "Consume specific amounts of nutrient-rich foods daily", "Eat protein-rich meals with specific timing", "Take supplements with exact dosages", "Drink herbal beverages with specific preparation methods", "Add spices and herbs with precise measurements"
 
   MOVEMENT CATEGORY ONLY:
   - Physical exercise, workouts, yoga, walking, running, strength training, dance, sports
@@ -472,7 +423,7 @@ function suggestLLMPromptForRecommendations({ userProfile, category, alternative
   - NO food, supplements, meditation, breathing exercises
   - AVOID generic terms like "gentle movement", "stretching", "light activity", "moderate exercise"
   - REQUIRE specific exercises with exact details: sets, reps, weights, duration, intensity
-  - Examples: "Complete 3 sets of 12 squats with 15-pound weights 3 times per week", "Practice 45-minute vinyasa flow yoga 4 times per week", "Do 25-minute HIIT cardio sessions with 30-second intervals 4 times per week", "Perform 4 sets of 8 deadlifts with 20-pound dumbbells 3 times per week", "Complete 30-minute power walking at 4.5 mph pace 5 times per week"
+  - Examples: "Complete specific sets and reps with exact weights and timing", "Practice yoga with precise duration and frequency", "Do cardio sessions with specific intervals and duration", "Perform strength training with exact weights and sets", "Complete walking with specific pace and duration"
 
   MINDFULNESS CATEGORY ONLY:
   - Meditation, breathing exercises, relaxation techniques, stress management, mental wellness
@@ -480,7 +431,7 @@ function suggestLLMPromptForRecommendations({ userProfile, category, alternative
   - NO food, supplements, physical exercise, yoga, movement
   - AVOID generic terms like "relaxation", "stress management", "mental wellness"
   - REQUIRE specific techniques with exact timing and methods
-  - Examples: "Practice 15-minute Vipassana meditation daily before breakfast", "Perform 20-minute 4-7-8 breathing exercises twice daily (morning and evening)", "Do 10 minutes of progressive muscle relaxation with guided audio before bed", "Practice 12-minute body scan meditation 3 times per week", "Complete 8-minute box breathing exercise 4 times daily during work breaks"
+  - Examples: "Practice specific meditation techniques with exact timing", "Perform breathing exercises with precise patterns and duration", "Do relaxation techniques with specific methods and timing", "Practice mindfulness with exact duration and frequency", "Complete stress management with specific techniques and timing"
 
   SCIENTIFIC REQUIREMENTS:
   - Use ONLY research studies from the last 10 years on women's hormonal health
@@ -489,11 +440,13 @@ function suggestLLMPromptForRecommendations({ userProfile, category, alternative
   - Medical factors (symptoms, diagnosis) carry more weight than demographic factors
   - STRONGLY prefer human clinical trials over animal studies
   - ALL recommendations must be actionable with specific amounts, durations, and frequencies
+  - IMPORTANT: The research database contains study data for reference only - DO NOT copy specific interventions from it
+  - Generate NEW recommendations based on the research findings, not by copying existing interventions
 
   CRITICAL REQUIREMENTS FOR SPECIFIC ACTIONS:
-  - FOOD: Specify exact amounts (grams, cups, servings) and frequency. Example: "Consume 2 tablespoons of ground flaxseed daily for 12 weeks" or "Eat 100g of salmon 3 times per week for 8 weeks"
-  - MOVEMENT: Specify exact duration, intensity, and frequency. Example: "Complete 3 sets of 12 squats with 15-pound weights 3 times per week for 12 weeks" or "Practice 45-minute vinyasa flow yoga 4 times per week for 8 weeks"
-  - MINDFULNESS: Specify exact duration, technique, and frequency. Example: "Practice 15-minute Vipassana meditation daily for 12 weeks" or "Perform 20-minute 4-7-8 breathing exercises twice daily for 8 weeks"
+  - FOOD: Specify exact amounts (grams, cups, servings) and frequency. Example: "Consume specific amounts of nutrient-rich foods daily for specific weeks" or "Eat protein-rich meals with exact timing and frequency"
+  - MOVEMENT: Specify exact duration, intensity, and frequency. Example: "Complete specific sets and reps with exact weights and timing for specific weeks" or "Practice specific exercises with exact duration and frequency"
+  - MINDFULNESS: Specify exact duration, technique, and frequency. Example: "Practice specific meditation techniques daily for specific weeks" or "Perform specific breathing exercises with exact timing and frequency"
   - ALL recommendations must include: exact duration (weeks/months), frequency (daily/weekly), and specific amounts/times
   - Base ALL recommendations on actual research studies from the last 10 years
   - CRITICAL: If user provided preferences, incorporate them into recommendations (e.g., if user prefers yoga, focus on specific yoga poses and sequences)
@@ -504,7 +457,145 @@ function suggestLLMPromptForRecommendations({ userProfile, category, alternative
   - Studies must include: title, authors (array), journal, publicationYear, participantCount, results
   - Example study: {"title": "Cinnamon Supplementation Improves Insulin Sensitivity in Women with PCOS", "authors": ["Lee J", "Kim S", "Park M"], "journal": "Diabetes Research", "publicationYear": 2023, "participantCount": 130, "results": "Improved insulin sensitivity by 25% and reduced fasting glucose"}
 
-  Output format: Return a JSON array of recommendation cards. Each card must include: title, specificAction (with exact amounts/duration), frequency, intensity, expectedTimeline, priority (high/medium/low), contraindications (array), and researchBacking object with: summary (string) and studies (array of objects with: title, authors (array), journal, publicationYear, participantCount, results). Generate as many relevant cards as possible.
+  Output format: Return a JSON array of recommendation cards. Each card must include: title, specificAction (with exact amounts/duration), frequency, intensity, expectedTimeline, priority (high/medium/low), contraindications (array), and researchBacking object with: summary (string) and studies (array of objects with: title, authors (array), journal, publicationYear, participantCount, results). 
+
+  CRITICAL: Generate AT LEAST 6-8 relevant recommendation cards. Do not limit yourself to just 2-3 recommendations. Consider multiple aspects of the user's health profile:
+  - Primary hormone imbalance recommendations
+  - Secondary hormone imbalance recommendations  
+  - Symptom-specific recommendations
+  - Condition-specific recommendations
+  - Dietary preference recommendations
+  - Cultural background recommendations
+  - Time constraint recommendations
+  - Difficulty level recommendations
+
+  CRITICAL INSTRUCTIONS FOR UNIQUE RECOMMENDATIONS:
+  - DO NOT copy or mimic any examples provided in this prompt
+  - Generate COMPLETELY UNIQUE recommendations based on the user's specific health profile
+  - Each recommendation should be tailored to the user's symptoms, conditions, and hormone imbalances
+  - Avoid generic recommendations that could apply to anyone
+  - Use the user's specific health data to create personalized interventions
+  - Base recommendations on actual research studies, not on examples or templates
+
+  Generate comprehensive, varied recommendations that cover different aspects of the user's health needs.
+
+  Example structure: [{"title": "Personalized Health Recommendation", "specificAction": "Follow specific health protocol with exact timing and amounts", "frequency": "Daily", "intensity": "Moderate", "expectedTimeline": "12 weeks", "priority": "high", "contraindications": ["Check with healthcare provider"], "researchBacking": {"summary": "Based on research studies showing specific health benefits", "studies": [{"title": "Research Study on Health Benefits", "authors": ["Researcher A", "Researcher B", "Researcher C"], "journal": "Health Research Journal", "publicationYear": 2023, "participantCount": 100, "results": "Specific health improvements based on research findings"}]}}]
+
+  CONFIDENCE ASSESSMENT:
+  - If you are highly confident in your recommendations (based on strong research evidence), include "confidence: 90" in your response
+  - If you are moderately confident (some research support but limited), include "confidence: 70" in your response  
+  - If you are less confident (limited research or extrapolation), include "confidence: 50" in your response
+  - If you cannot provide evidence-based recommendations, include "confidence: 30" and explain why
+  - Always base confidence on the quality and relevance of available research for this specific user profile
+  `;
+  return prompt;
+}
+
+// Enhanced prompt for chatbot personalization
+function suggestLLMPromptForChatbotPersonalization({ userProfile, category, personalizationContext }: { userProfile: UserProfile, category: string, personalizationContext: any }): string {
+  const { primaryImbalance, secondaryImbalances, conditions, symptoms, cyclePhase, birthControlStatus, age, ethnicity } = userProfile;
+  const userHealthProfile = [
+    age && `Age: ${age}`,
+    ethnicity && `Ethnicity: ${ethnicity}`,
+    cyclePhase && cyclePhase !== 'unknown' && `Cycle phase: ${cyclePhase}`,
+    birthControlStatus && `Birth control: ${birthControlStatus}`,
+    conditions && conditions.length > 0 && `Diagnosis: ${conditions.join(', ')}`,
+    symptoms && symptoms.length > 0 && `Symptoms: ${symptoms.join(', ')}`
+  ].filter(Boolean).join(', ');
+  const secondaryImbalancesText = secondaryImbalances && secondaryImbalances.length > 0 
+    ? `, Secondary: ${secondaryImbalances.join(', ')}` 
+    : '';
+  const userPreferences = personalizationContext.preferences || [];
+  const userPreferencesText = userPreferences.length > 0 
+    ? `User preferences for alternatives: ${userPreferences.join(', ')}` 
+    : 'No personalization data available';
+
+  const prompt = `
+  You are a medical AI assistant specializing in women's hormone health. Your task is to generate HIGHLY SPECIFIC, SCIENTIFICALLY-BASED recommendations with exact amounts, durations, and frequencies.
+
+  Category: ${category}
+  Root cause (hormones out of balance): ${primaryImbalance}${secondaryImbalancesText}
+  User health profile: ${userHealthProfile}
+  ${userPreferencesText}
+
+  USER PERSONALIZATION PREFERENCES (USE THESE TO CUSTOMIZE RECOMMENDATIONS):
+  ${userPreferences.length > 0 ? `
+  - User preferences: ${userPreferences.join(', ')}
+  - IMPORTANT: Use these preferences to customize recommendations
+  - For movement: Focus on specific exercises, avoid generic terms like "gentle movement" or "stretching"
+  - For food: Consider dietary restrictions and preferences
+  - For mindfulness: Focus on specific techniques, avoid generic terms
+  ` : 'No personalization data available'}
+
+  STRICT CATEGORIZATION RULES - ONLY generate recommendations that fit EXACTLY in the specified category:
+
+  FOOD CATEGORY ONLY:
+  - Food items, meals, dietary patterns, nutritional supplements, vitamins, minerals
+  - Herbal teas, spices, herbs, beverages, drinks, infusions, extracts
+  - Cooking methods, meal timing, portion sizes, food combinations
+  - NO exercise, movement, yoga, meditation, breathing exercises
+  - REQUIRE specific amounts, timing, and preparation methods
+  - Examples: "Consume specific amounts of nutrient-rich foods daily", "Eat protein-rich meals with specific timing", "Take supplements with exact dosages", "Drink herbal beverages with specific preparation methods", "Add spices and herbs with precise measurements"
+
+  MOVEMENT CATEGORY ONLY:
+  - Physical exercise, workouts, yoga, walking, running, strength training, dance, sports
+  - Movement patterns, exercise routines, physical activities
+  - NO food, supplements, meditation, breathing exercises
+  - AVOID generic terms like "gentle movement", "stretching", "light activity", "moderate exercise"
+  - REQUIRE specific exercises with exact details: sets, reps, weights, duration, intensity
+  - Examples: "Complete specific sets and reps with exact weights and timing", "Practice yoga with precise duration and frequency", "Do cardio sessions with specific intervals and duration", "Perform strength training with exact weights and sets", "Complete walking with specific pace and duration"
+
+  MINDFULNESS CATEGORY ONLY:
+  - Meditation, breathing exercises, relaxation techniques, stress management, mental wellness
+  - Mindfulness practices, mental health exercises, emotional regulation
+  - NO food, supplements, physical exercise, yoga, movement
+  - AVOID generic terms like "relaxation", "stress management", "mental wellness"
+  - REQUIRE specific techniques with exact timing and methods
+  - Examples: "Practice specific meditation techniques with exact timing", "Perform breathing exercises with precise patterns and duration", "Do relaxation techniques with specific methods and timing", "Practice mindfulness with exact duration and frequency", "Complete stress management with specific techniques and timing"
+
+  SCIENTIFIC REQUIREMENTS:
+  - Use ONLY research studies from the last 10 years on women's hormonal health
+  - Medical accuracy is CRITICAL - every recommendation must be based on actual clinical studies
+  - Match research to user's specific health profile (hormones, conditions, symptoms)
+  - Medical factors (symptoms, diagnosis) carry more weight than demographic factors
+  - STRONGLY prefer human clinical trials over animal studies
+  - ALL recommendations must be actionable with specific amounts, durations, and frequencies
+
+  CRITICAL REQUIREMENTS FOR SPECIFIC ACTIONS:
+  - FOOD: Specify exact amounts (grams, cups, servings) and frequency. Example: "Consume specific amounts of nutrient-rich foods daily for 12 weeks" or "Eat protein-rich meals with exact timing and frequency"
+  - MOVEMENT: Specify exact duration, intensity, and frequency. Example: "Complete specific sets and reps with exact weights and timing for specific weeks" or "Practice specific exercises with exact duration and frequency"
+  - MINDFULNESS: Specify exact duration, technique, and frequency. Example: "Practice specific meditation techniques daily for specific weeks" or "Perform specific breathing exercises with exact timing and frequency"
+  - ALL recommendations must include: exact duration (weeks/months), frequency (daily/weekly), and specific amounts/times
+  - Base ALL recommendations on actual research studies from the last 10 years
+  - CRITICAL: If user provided preferences, incorporate them into recommendations (e.g., if user prefers yoga, focus on specific yoga poses and sequences)
+
+  RESEARCH BACKING FORMAT:
+  - Summary: "Based on [YEAR] study with [NUMBER] women showing [SPECIFIC RESULTS]"
+  - Example: "Based on 2023 study with 130 women showing Improved insulin sensitivity by 25% and reduced fasting glucose"
+  - Studies must include: title, authors (array), journal, publicationYear, participantCount, results
+  - Example study: {"title": "Cinnamon Supplementation Improves Insulin Sensitivity in Women with PCOS", "authors": ["Lee J", "Kim S", "Park M"], "journal": "Diabetes Research", "publicationYear": 2023, "participantCount": 130, "results": "Improved insulin sensitivity by 25% and reduced fasting glucose"}
+
+  Output format: Return a JSON array of recommendation cards. Each card must include: title, specificAction (with exact amounts/duration), frequency, intensity, expectedTimeline, priority (high/medium/low), contraindications (array), and researchBacking object with: summary (string) and studies (array of objects with: title, authors (array), journal, publicationYear, participantCount, results). 
+
+  CRITICAL: Generate AT LEAST 6-8 relevant recommendation cards. Do not limit yourself to just 2-3 recommendations. Consider multiple aspects of the user's health profile:
+  - Primary hormone imbalance recommendations
+  - Secondary hormone imbalance recommendations  
+  - Symptom-specific recommendations
+  - Condition-specific recommendations
+  - Dietary preference recommendations
+  - Cultural background recommendations
+  - Time constraint recommendations
+  - Difficulty level recommendations
+
+  CRITICAL INSTRUCTIONS FOR UNIQUE RECOMMENDATIONS:
+  - DO NOT copy or mimic any examples provided in this prompt
+  - Generate COMPLETELY UNIQUE recommendations based on the user's specific health profile
+  - Each recommendation should be tailored to the user's symptoms, conditions, and hormone imbalances
+  - Avoid generic recommendations that could apply to anyone
+  - Use the user's specific health data to create personalized interventions
+  - Base recommendations on actual research studies, not on examples or templates
+
+  Generate comprehensive, varied recommendations that cover different aspects of the user's health needs.
 
   Example structure: [{"title": "Cinnamon Supplementation for Insulin Sensitivity", "specificAction": "Take 1.5g of cinnamon powder daily for 12 weeks", "frequency": "Daily", "intensity": "Moderate", "expectedTimeline": "12 weeks", "priority": "high", "contraindications": ["Not recommended during pregnancy"], "researchBacking": {"summary": "Based on 2023 study with 130 women showing Improved insulin sensitivity by 25% and reduced fasting glucose", "studies": [{"title": "Cinnamon Supplementation Improves Insulin Sensitivity in Women with PCOS", "authors": ["Lee J", "Kim S", "Park M"], "journal": "Diabetes Research", "publicationYear": 2023, "participantCount": 130, "results": "Improved insulin sensitivity by 25% and reduced fasting glucose"}]}}]
 
@@ -519,49 +610,75 @@ function suggestLLMPromptForRecommendations({ userProfile, category, alternative
 }
 
 export async function POST(request: NextRequest) {
-  const { userProfile, category, alternativePreferences } = await request.json();
+  const { userProfile, category, alternativePreferences, personalizationContext } = await request.json();
   
   if (!userProfile || !category) {
     return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
   }
 
-  // 상세 프롬프트 사용
-  const prompt = suggestLLMPromptForRecommendations({ userProfile, category, alternativePreferences });
+  // Enhanced prompt for chatbot personalization
+  let prompt;
+  if (personalizationContext && personalizationContext.type === 'chatbot-personalization') {
+    // Special prompt for chatbot personalization that focuses on user preferences and health profile
+    prompt = suggestLLMPromptForChatbotPersonalization({ userProfile, category, personalizationContext });
+  } else {
+    // Standard prompt for regular recommendations
+    prompt = suggestLLMPromptForRecommendations({ userProfile, category, alternativePreferences });
+  }
 
   // 2. OpenAI 호출
   let llmResponse = await callOpenAI(prompt);
   let confidence = evaluateLLMConfidence(llmResponse);
   let recommendations = parseRecommendationsFromLLM(llmResponse, category);
+  
+  console.log('🔍 After OpenAI call:');
+  console.log('  - Response length:', llmResponse.length);
+  console.log('  - Confidence:', confidence);
+  console.log('  - Parsed recommendations count:', recommendations.length);
+  console.log('  - First 2 recommendations:', recommendations.slice(0, 2).map(r => r.title));
 
   // 3. Fallback 로직: 신뢰도가 낮거나 추천이 없으면 Groq 사용
-  console.log('OpenAI 신뢰도:', confidence, '추천 개수:', recommendations.length);
+  console.log('🔄 Fallback logic check: confidence < 60 OR recommendations.length === 0');
+  console.log('  - Current confidence:', confidence, '(< 60?)', confidence < 60);
+  console.log('  - Current recommendations count:', recommendations.length, '(=== 0?)', recommendations.length === 0);
   
   if (confidence < 60 || recommendations.length === 0) {
-    console.log('Fallback 실행: Groq 호출');
+    console.log('🔄 Fallback 실행: Groq 호출');
     const groqResponse = await callGroq(prompt);
     const groqConfidence = evaluateLLMConfidence(groqResponse);
     const groqRecommendations = parseRecommendationsFromLLM(groqResponse, category);
     
-    console.log('Groq 신뢰도:', groqConfidence, '추천 개수:', groqRecommendations.length);
+    console.log('🔍 After Groq call:');
+    console.log('  - Response length:', groqResponse.length);
+    console.log('  - Confidence:', groqConfidence);
+    console.log('  - Parsed recommendations count:', groqRecommendations.length);
+    console.log('  - First 2 recommendations:', groqRecommendations.slice(0, 2).map(r => r.title));
     
     // Groq 결과가 더 나으면 사용
     if (groqRecommendations.length > 0 && groqConfidence > confidence) {
       llmResponse = groqResponse;
       confidence = groqConfidence;
       recommendations = groqRecommendations;
-      console.log('Groq 결과로 교체됨');
+      console.log('✅ Groq 결과로 교체됨');
     } else {
-      console.log('OpenAI 결과 유지');
+      console.log('✅ OpenAI 결과 유지');
     }
   }
 
   // 4. Filter recommendations by category to ensure proper categorization
   const filteredRecommendations = filterRecommendationsByCategory(recommendations, category);
-  console.log(`Category: ${category}, Original: ${recommendations.length}, Filtered: ${filteredRecommendations.length}`);
+  console.log(`🔍 After category filtering:`);
+  console.log(`  - Category: ${category}`);
+  console.log(`  - Original count: ${recommendations.length}`);
+  console.log(`  - Filtered count: ${filteredRecommendations.length}`);
+  console.log(`  - Removed: ${recommendations.length - filteredRecommendations.length} recommendations`);
 
   // 5. Post-processing: Ensure food items are in the correct category
   const finalRecommendations = postProcessRecommendations(filteredRecommendations, category);
-  console.log(`Category: ${category}, Final: ${finalRecommendations.length} recommendations`);
+  console.log(`🔍 After post-processing:`);
+  console.log(`  - Category: ${category}`);
+  console.log(`  - Final count: ${finalRecommendations.length}`);
+  console.log(`  - Post-processing removed: ${filteredRecommendations.length - finalRecommendations.length} recommendations`);
 
   // 6. Fallback: If no recommendations after filtering, generate basic ones
   if (finalRecommendations.length === 0) {
@@ -575,6 +692,34 @@ export async function POST(request: NextRequest) {
       confidence: 50,
       rawLLMResponse: llmResponse,
       note: 'Fallback recommendations generated due to filtering'
+    });
+  }
+
+  // 7. Additional fallback: If we have fewer than 6 recommendations, enhance with more
+  if (finalRecommendations.length < 6) {
+    console.log(`⚠️ Only ${finalRecommendations.length} recommendations, enhancing with additional fallback recommendations...`);
+    const additionalFallbacks = generateFallbackRecommendations(category, userProfile);
+    
+    // Add unique fallback recommendations to reach at least 6
+    const uniqueFallbacks = additionalFallbacks.filter(fallback => 
+      !finalRecommendations.some(existing => 
+        existing.title?.toLowerCase() === fallback.title?.toLowerCase()
+      )
+    );
+    
+    const enhancedRecommendations = [
+      ...finalRecommendations,
+      ...uniqueFallbacks.slice(0, 6 - finalRecommendations.length)
+    ];
+    
+    console.log(`🔄 Enhanced to ${enhancedRecommendations.length} total recommendations`);
+    
+    return NextResponse.json({
+      success: true,
+      recommendations: enhancedRecommendations,
+      confidence: Math.max(confidence - 10, 30), // Slightly reduce confidence due to fallbacks
+      rawLLMResponse: llmResponse,
+      note: `Enhanced with ${enhancedRecommendations.length - finalRecommendations.length} fallback recommendations to reach minimum count`
     });
   }
 
